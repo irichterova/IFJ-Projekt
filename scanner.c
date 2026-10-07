@@ -47,6 +47,7 @@ enum keywords_enum {
 enum states {
     S_START,
     S_GT,
+    S_LT,
 };
 
 union token_data {
@@ -88,11 +89,12 @@ token_t get_token() {
         symbol = getchar();
         switch (state) {
             case S_START:
-                if (symbol == '>') state = S_GT;
-                else if (symbol == EOF) {
+                if (symbol == EOF) {
                     token.type = TOKEN_EOF;
                     return token;
                 }
+                else if (symbol == '>') state = S_GT;
+                else if (symbol == '<') state = S_LT;
                 break;
             case S_GT:
                 if (symbol == '=') {
@@ -106,6 +108,20 @@ token_t get_token() {
                 else {
                     ungetc(symbol, stdin);
                     token.type = TOKEN_OP_GT;
+                    return token;
+                }
+            case S_LT:
+                if (symbol == '=') {
+                    token.type = TOKEN_OP_LE;
+                    return token;
+                }
+                else if (symbol == EOF) {
+                    token.type = TOKEN_OP_LT;
+                    return token;
+                }
+                else {
+                    ungetc(symbol, stdin);
+                    token.type = TOKEN_OP_LT;
                     return token;
                 }
         }
