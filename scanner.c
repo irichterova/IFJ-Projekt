@@ -12,9 +12,9 @@ enum token_types {
     TOKEN_OP_SUB,
     TOKEN_OP_MUL,
     TOKEN_OP_DIV,
-    TOKEN_OP_L,
+    TOKEN_OP_LT,
     TOKEN_OP_LE,
-    TOKEN_OP_G,
+    TOKEN_OP_GT,
     TOKEN_OP_GE,
     TOKEN_OP_EQ,
     TOKEN_OP_NEQ,
@@ -42,6 +42,11 @@ enum keywords_enum {
     KEYWORD_VAL,
     KEYWORD_VAR,
     KEYWORD_WHILE,
+};
+
+enum states {
+    S_START,
+    S_GT,
 };
 
 union token_data {
@@ -73,3 +78,36 @@ char* keywords_arr[] = {
     "var",
     "while"
 };
+
+token_t get_token() {
+    int symbol;
+    token_t token = {0};
+    enum states state;
+    state = S_START;
+    while (1) {
+        symbol = getchar();
+        switch (state) {
+            case S_START:
+                if (symbol == '>') state = S_GT;
+                else if (symbol == EOF) {
+                    token.type = TOKEN_EOF;
+                    return token;
+                }
+                break;
+            case S_GT:
+                if (symbol == '=') {
+                    token.type = TOKEN_OP_GE;
+                    return token;
+                }
+                else if (symbol == EOF) {
+                    token.type = TOKEN_OP_GT;
+                    return token;
+                }
+                else {
+                    ungetc(symbol, stdin);
+                    token.type = TOKEN_OP_GT;
+                    return token;
+                }
+        }
+    }
+}
