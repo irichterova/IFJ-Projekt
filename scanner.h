@@ -1,3 +1,9 @@
+/**
+ * Project name: Implementace překladače imperativního jazyka IFJ26
+ * @author Izabela Richterová (xrichti00)
+ * @file scanner.h
+ */
+
 #ifndef SCANNER_H
 #define SCANNER_H
 

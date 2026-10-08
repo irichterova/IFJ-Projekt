@@ -1,3 +1,9 @@
+/**
+ * Project name: Implementace překladače imperativního jazyka IFJ26
+ * @author Izabela Richterová (xrichti00)
+ * @file scanner.c
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "scanner.h"
@@ -40,10 +46,30 @@ token_t get_token() {
                     token.type = TOKEN_EOF;
                     return token;
                 }
+                else if (symbol == '@') {
+                    token.type = TOKEN_AT;
+                    return token;
+                }
                 else if (symbol == '>') state = S_GT;
                 else if (symbol == '<') state = S_LT;
                 else if (symbol == '=') state = S_ASSIGN;
                 else if (symbol == '!') state = S_NOT;
+                else if (symbol == '+') {
+                    token.type = TOKEN_OP_ADD;
+                    return token;
+                }
+                else if (symbol == '-') {
+                    token.type = TOKEN_OP_SUB;
+                    return token;
+                }
+                else if (symbol == '*') {
+                    token.type = TOKEN_OP_MUL;
+                    return token;
+                }
+                else if (symbol == '/') {
+                    token.type = TOKEN_OP_DIV;
+                    return token;
+                }
                 break;
             case S_GT:
                 if (symbol == '=') {
