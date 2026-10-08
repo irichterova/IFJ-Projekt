@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 enum token_types {
     TOKEN_IDENTIFIER,
@@ -48,6 +49,8 @@ enum states {
     S_START,
     S_GT,
     S_LT,
+    S_ASSIGN,
+    S_NOT,
 };
 
 union token_data {
@@ -95,6 +98,8 @@ token_t get_token() {
                 }
                 else if (symbol == '>') state = S_GT;
                 else if (symbol == '<') state = S_LT;
+                else if (symbol == '=') state = S_ASSIGN;
+                else if (symbol == '!') state = S_NOT;
                 break;
             case S_GT:
                 if (symbol == '=') {
@@ -123,6 +128,29 @@ token_t get_token() {
                     ungetc(symbol, stdin);
                     token.type = TOKEN_OP_LT;
                     return token;
+                }
+            case S_ASSIGN:
+                if (symbol == '=') {
+                    token.type = TOKEN_OP_EQ;
+                    return token;
+                }
+                else if (symbol == EOF) {
+                    token.type = TOKEN_ASSIGN;
+                    return token;
+                }
+                else {
+                    ungetc(symbol, stdin);
+                    token.type = TOKEN_ASSIGN;
+                    return token;
+                }
+            case S_NOT:
+                if (symbol == '=') {
+                    token.type = TOKEN_OP_NEQ;
+                    return token;
+                }
+                else {
+                    fprintf(stderr, "Error: expected '=' after '!'\n");
+                    exit(1);
                 }
         }
     }
