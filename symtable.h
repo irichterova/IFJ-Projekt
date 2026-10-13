@@ -74,5 +74,14 @@ typedef struct hashtable
 
 }hashtable;
 
+int hash_function(char* key);
+bool hashtable_init(hashtable* hstable);
+bool rehash_hashtable(hashtable* hstable);
+void delete_hashtable(hashtable* hstable);
+
+void insert_hash(item* item_to_insert, hashtable* hstable);
+int redirect_hash(item* item_to_redirect, hashtable* hstable);
+attributes* search_symbol(char* item_to_search, hashtable* hstable);
+bool tombstone_hash(item* item_to_tombs, hashtable* hstable);
 
 #endif
