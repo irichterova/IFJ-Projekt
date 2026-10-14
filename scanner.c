@@ -50,6 +50,30 @@ token_t get_token() {
                     token.type = TOKEN_AT;
                     return token;
                 }
+                else if (symbol == ':') {
+                    token.type = TOKEN_COLON;
+                    return token;
+                }
+                else if (symbol == ';') {
+                    token.type = TOKEN_SEMICOLON;
+                    return token;
+                }
+                else if (symbol == ',') {
+                    token.type = TOKEN_COMMA;
+                    return token;
+                }
+                else if (symbol == '.') {
+                    token.type = TOKEN_PERIOD;
+                    return token;
+                }
+                else if (symbol == '(') {
+                    token.type = TOKEN_L_PARENTH;
+                    return token;
+                }
+                else if (symbol == ')') {
+                    token.type = TOKEN_R_PARENTH;
+                    return token;
+                }
                 else if (symbol == '>') state = S_GT;
                 else if (symbol == '<') state = S_LT;
                 else if (symbol == '=') state = S_ASSIGN;
