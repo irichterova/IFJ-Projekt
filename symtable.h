@@ -9,7 +9,6 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26 code
 @author xdongop00 Phuong Uyen Dongova
 *
 */
-
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
@@ -18,6 +17,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26 code
 #include <stddef.h>
 #include <stdbool.h>
 
+#define INITIAL_CAPACITY 16
 
 typedef enum 
 {
@@ -31,8 +31,8 @@ typedef enum
 
 typedef enum  
 {
-    slot_tombstoned,
     slot_available,
+    slot_tombstoned,
     slot_taken,
 
 }status;
@@ -66,15 +66,16 @@ typedef struct
 
 typedef struct hashtable
 {
-    size_t size;
+    size_t capacity;
     item* item_array; 
+    int available_slots;
     int used_slots;
-    int free_slots;
+    int tombstoned_slots;
     struct hashtable* parent;
 
 }hashtable;
 
-int hash_function(char* key);
+int hash_function(hashtable* hstable, char* key);
 bool hashtable_init(hashtable* hstable);
 bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);
