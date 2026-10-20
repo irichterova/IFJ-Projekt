@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "scanner.h"
 
 enum states {
@@ -66,6 +67,16 @@ void buffer_destruct (buffer_t *buffer) {
     buffer->size = 0;
     free(buffer->data); 
     buffer->data = NULL;
+}
+
+int compare_with_keywords (char* identifier) {
+    int keywords_arr_size = sizeof(keywords_arr) / sizeof(keywords_arr[0]);
+    for (int i = 0; i < keywords_arr_size; i++) {
+        if (strcmp(keywords_arr[i], identifier) == 0) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 token_t get_token() {
@@ -199,14 +210,30 @@ token_t get_token() {
                     break;
                 }
                 else if (symbol == EOF) {
-                    token.type = TOKEN_IDENTIFIER;
                     add_symbol2buffer(&identif_buffer, '\0');
+                    int keyword = compare_with_keywords(identif_buffer.data);
+                    if (keyword != -1) {
+                        token.type = TOKEN_KEYWORD;
+                        token.data.keyword = keyword;
+                    }
+                    else {
+                        token.type = TOKEN_IDENTIFIER;
+                    }
+                    buffer_destruct(&identif_buffer);
                     return token;
                 }
                 else {
                     ungetc(symbol, stdin);
-                    token.type = TOKEN_IDENTIFIER;
                     add_symbol2buffer(&identif_buffer, '\0');
+                    int keyword = compare_with_keywords(identif_buffer.data);
+                    if (keyword != -1) {
+                        token.type = TOKEN_KEYWORD;
+                        token.data.keyword = keyword;
+                    }
+                    else {
+                        token.type = TOKEN_IDENTIFIER;
+                    }
+                    buffer_destruct(&identif_buffer);
                     return token;
                 }
             case S_UNDERSCORE:
