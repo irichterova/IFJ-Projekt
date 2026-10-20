@@ -157,43 +157,31 @@ token_t get_token() {
                     token.type = TOKEN_OP_GE;
                     return token;
                 }
-                else if (symbol == EOF) {
-                    token.type = TOKEN_OP_GT;
-                    return token;
-                }
-                else {
+                else if (symbol != EOF) {
                     ungetc(symbol, stdin);
-                    token.type = TOKEN_OP_GT;
-                    return token;
                 }
+                token.type = TOKEN_OP_GT;
+                return token;
             case S_LT:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_LE;
                     return token;
                 }
-                else if (symbol == EOF) {
-                    token.type = TOKEN_OP_LT;
-                    return token;
-                }
-                else {
+                else if (symbol != EOF) {
                     ungetc(symbol, stdin);
-                    token.type = TOKEN_OP_LT;
-                    return token;
                 }
+                token.type = TOKEN_OP_LT;
+                return token;
             case S_ASSIGN:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_EQ;
                     return token;
                 }
-                else if (symbol == EOF) {
-                    token.type = TOKEN_ASSIGN;
-                    return token;
-                }
-                else {
+                else if (symbol != EOF) {
                     ungetc(symbol, stdin);
-                    token.type = TOKEN_ASSIGN;
-                    return token;
                 }
+                token.type = TOKEN_ASSIGN;
+                return token;
             case S_NOT:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_NEQ;
@@ -209,33 +197,20 @@ token_t get_token() {
                     add_symbol2buffer(&identif_buffer, symbol);
                     break;
                 }
-                else if (symbol == EOF) {
-                    add_symbol2buffer(&identif_buffer, '\0');
-                    int keyword = compare_with_keywords(identif_buffer.data);
-                    if (keyword != -1) {
-                        token.type = TOKEN_KEYWORD;
-                        token.data.keyword = keyword;
-                    }
-                    else {
-                        token.type = TOKEN_IDENTIFIER;
-                    }
-                    buffer_destruct(&identif_buffer);
-                    return token;
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                add_symbol2buffer(&identif_buffer, '\0');
+                int keyword = compare_with_keywords(identif_buffer.data);
+                if (keyword != -1) {
+                    token.type = TOKEN_KEYWORD;
+                    token.data.keyword = keyword;
                 }
                 else {
-                    ungetc(symbol, stdin);
-                    add_symbol2buffer(&identif_buffer, '\0');
-                    int keyword = compare_with_keywords(identif_buffer.data);
-                    if (keyword != -1) {
-                        token.type = TOKEN_KEYWORD;
-                        token.data.keyword = keyword;
-                    }
-                    else {
-                        token.type = TOKEN_IDENTIFIER;
-                    }
-                    buffer_destruct(&identif_buffer);
-                    return token;
+                    token.type = TOKEN_IDENTIFIER;
                 }
+                buffer_destruct(&identif_buffer);
+                return token;
             case S_UNDERSCORE:
                 if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z') || 
                 (symbol >= '0' && symbol <= '9') || (symbol == '_')) {
