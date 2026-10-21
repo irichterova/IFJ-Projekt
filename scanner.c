@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 #include "scanner.h"
 
 enum states {
@@ -16,7 +18,9 @@ enum states {
     S_ASSIGN,
     S_NOT,
     S_IDENTIF,
-    S_UNDERSCORE,
+    S_ID_UNDERSCORE,
+    S_INT,
+    S_INT_UNDERSCORE,
 };
 
 char* keywords_arr[] = {
@@ -102,6 +106,21 @@ int compare_with_keywords (char* identifier) {
 }
 
 /**
+ * @brief Converts the string to integer 
+ * @param string String ending with '\0' to be converted to integer
+ * @return Converted integer value if the conversion was successful
+ */
+int convert_str2int (char* string) {
+    char* endptr;
+    long long number;
+    errno = 0;
+    number = strtoll(string, &endptr, 10);
+    if (*endptr == '\0' && errno == 0 && number <= INT_MAX) return number;
+    fprintf(stderr, "Error: Invalid number\n");
+    exit(1);   
+}
+
+/**
  * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
  * @return Data structure "token" 
  */
@@ -110,7 +129,7 @@ token_t get_token() {
     token_t token = {0};
     enum states state;
     state = S_START;
-    buffer_t identif_buffer;
+    buffer_t identif_buffer, number_buffer;
     while (1) {
         symbol = getchar();
         switch (state) {
@@ -173,9 +192,19 @@ token_t get_token() {
                     add_symbol2buffer(&identif_buffer, symbol);
                 }
                 else if (symbol == '_') {
-                    state = S_UNDERSCORE;
+                    state = S_ID_UNDERSCORE;
                     buffer_init(&identif_buffer);
                     add_symbol2buffer(&identif_buffer, symbol);
+                }
+                else if (symbol >= '1' && symbol <= '9') {
+                    state = S_INT;
+                    buffer_init(&number_buffer);
+                    add_symbol2buffer(&number_buffer, symbol);
+                }
+                else if (symbol == '0') {
+                    token.type = TOKEN_INT_LITERAL;
+                    token.data.int_value = 0;
+                    return token;
                 }
                 break;
             case S_GT:
@@ -237,7 +266,7 @@ token_t get_token() {
                 }
                 buffer_destruct(&identif_buffer);
                 return token;
-            case S_UNDERSCORE:
+            case S_ID_UNDERSCORE:
                 if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z') || 
                 (symbol >= '0' && symbol <= '9') || (symbol == '_')) {
                     state = S_IDENTIF;
@@ -245,7 +274,36 @@ token_t get_token() {
                     break;
                 }
                 else {
-                    fprintf(stderr, "Error: '_' is an invalid character\n");
+                    buffer_destruct(&identif_buffer);
+                    fprintf(stderr, "Error: '_' alone is not a valid identifier\n");
+                    exit(1);
+                }
+            case S_INT:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    break;
+                }
+                else if (symbol == '_') {
+                    state = S_INT_UNDERSCORE;
+                    break;
+                }
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                add_symbol2buffer(&number_buffer, '\0');
+                token.type = TOKEN_INT_LITERAL;
+                token.data.int_value = convert_str2int(number_buffer.data);
+                buffer_destruct(&number_buffer);
+                return token;
+            case S_INT_UNDERSCORE:
+                if (symbol >= '0' && symbol <= '9') {
+                    state = S_INT;
+                    add_symbol2buffer(&number_buffer, symbol);
+                    break;
+                }
+                else {
+                    buffer_destruct(&number_buffer);
+                    fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
                     exit(1);
                 }
         }
