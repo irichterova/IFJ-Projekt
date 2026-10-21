@@ -21,6 +21,11 @@ enum states {
     S_ID_UNDERSCORE,
     S_INT,
     S_INT_UNDERSCORE,
+    S_ZERO,
+    S_PERIOD,
+    S_INT_PERIOD,
+    S_DOUBLE,
+    S_DBL_UNDERSCORE,
 };
 
 char* keywords_arr[] = {
@@ -111,13 +116,26 @@ int compare_with_keywords (char* identifier) {
  * @return Converted integer value if the conversion was successful
  */
 int convert_str2int (char* string) {
-    char* endptr;
-    long long number;
     errno = 0;
-    number = strtoll(string, &endptr, 10);
+    char* endptr;
+    long long number = strtoll(string, &endptr, 10);
     if (*endptr == '\0' && errno == 0 && number <= INT_MAX) return number;
     fprintf(stderr, "Error: Invalid number\n");
     exit(1);   
+}
+
+/**
+ * @brief Converts the string to double
+ * @param string String ending with '\0'to be converted to double
+ * @return Converted double value if the conversion was successful
+ */
+double convert_str2dbl (char* string) {
+    errno = 0;
+    char* endptr;
+    double number = strtod(string, &endptr);
+    if (*endptr == '\0' && errno == 0) return number;
+    fprintf(stderr, "Error: Invalid number\n");
+    exit(1);
 }
 
 /**
@@ -154,10 +172,7 @@ token_t get_token() {
                     token.type = TOKEN_COMMA;
                     return token;
                 }
-                else if (symbol == '.') {
-                    token.type = TOKEN_PERIOD;
-                    return token;
-                }
+                else if (symbol == '.') state = S_PERIOD;
                 else if (symbol == '(') {
                     token.type = TOKEN_L_PARENTH;
                     return token;
@@ -201,11 +216,7 @@ token_t get_token() {
                     buffer_init(&number_buffer);
                     add_symbol2buffer(&number_buffer, symbol);
                 }
-                else if (symbol == '0') {
-                    token.type = TOKEN_INT_LITERAL;
-                    token.data.int_value = 0;
-                    return token;
-                }
+                else if (symbol == '0') state = S_ZERO;
                 break;
             case S_GT:
                 if (symbol == '=') {
@@ -287,6 +298,11 @@ token_t get_token() {
                     state = S_INT_UNDERSCORE;
                     break;
                 }
+                else if (symbol == '.') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_INT_PERIOD;
+                    break;
+                }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
@@ -299,6 +315,72 @@ token_t get_token() {
                 if (symbol >= '0' && symbol <= '9') {
                     state = S_INT;
                     add_symbol2buffer(&number_buffer, symbol);
+                    break;
+                }
+                else {
+                    buffer_destruct(&number_buffer);
+                    fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
+                    exit(1);
+                }
+            case S_ZERO:
+                if (symbol == '.') {
+                    buffer_init(&number_buffer);
+                    add_symbol2buffer(&number_buffer, '0');
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_INT_PERIOD;
+                    break;
+                }
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                token.type = TOKEN_INT_LITERAL;
+                token.data.int_value = 0;
+                return token;
+            case S_PERIOD:
+                if (symbol >= '0' && symbol <= '9') {
+                    buffer_init(&number_buffer);
+                    add_symbol2buffer(&number_buffer, '.');
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DOUBLE;
+                    break;
+                }
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                token.type = TOKEN_PERIOD;
+                return token;
+            case S_INT_PERIOD:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DOUBLE;
+                    break;
+                }
+                else {
+                    buffer_destruct(&number_buffer);
+                    fprintf(stderr, "Error: '.' after a digit must be followed by another digit\n");
+                    exit(1);
+                }
+            case S_DOUBLE:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    break;
+                }
+                else if (symbol == '_') {
+                    state = S_DBL_UNDERSCORE;
+                    break;
+                }
+                else if (symbol != EOF && symbol != 'd' && symbol != 'D') {
+                    ungetc(symbol, stdin);
+                }
+                add_symbol2buffer(&number_buffer, '\0');
+                token.type = TOKEN_DBL_LITERAL;
+                token.data.dbl_value = convert_str2dbl(number_buffer.data);
+                buffer_destruct(&number_buffer);
+                return token;
+            case S_DBL_UNDERSCORE:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DOUBLE;
                     break;
                 }
                 else {
