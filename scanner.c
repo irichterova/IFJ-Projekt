@@ -24,8 +24,12 @@ enum states {
     S_ZERO,
     S_PERIOD,
     S_INT_PERIOD,
-    S_DOUBLE,
-    S_DBL_UNDERSCORE,
+    S_DBL_DECIMAL,
+    S_DBL_DECIMAL_UNDERSCORE,
+    S_EXPONENT,
+    S_DBL_EXP,
+    S_DBL_EXP_SIGN,
+    S_DBL_EXP_UNDERSCORE,
 };
 
 char* keywords_arr[] = {
@@ -254,7 +258,7 @@ token_t get_token() {
                     return token;
                 }
                 else {
-                    fprintf(stderr, "Error: expected '=' after '!'\n");
+                    fprintf(stderr, "Error: Expected '=' after '!'\n");
                     exit(1);
                 }
             case S_IDENTIF:
@@ -303,6 +307,11 @@ token_t get_token() {
                     state = S_INT_PERIOD;
                     break;
                 }
+                else if (symbol == 'e' || symbol == 'E') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_EXPONENT;
+                    break;
+                }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
@@ -330,6 +339,13 @@ token_t get_token() {
                     state = S_INT_PERIOD;
                     break;
                 }
+                else if (symbol == 'e' || symbol == 'E') {
+                    buffer_init(&number_buffer);
+                    add_symbol2buffer(&number_buffer, '0');
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_EXPONENT;
+                    break;
+                }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
@@ -341,7 +357,7 @@ token_t get_token() {
                     buffer_init(&number_buffer);
                     add_symbol2buffer(&number_buffer, '.');
                     add_symbol2buffer(&number_buffer, symbol);
-                    state = S_DOUBLE;
+                    state = S_DBL_DECIMAL;
                     break;
                 }
                 else if (symbol != EOF) {
@@ -352,7 +368,7 @@ token_t get_token() {
             case S_INT_PERIOD:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
-                    state = S_DOUBLE;
+                    state = S_DBL_DECIMAL;
                     break;
                 }
                 else {
@@ -360,13 +376,18 @@ token_t get_token() {
                     fprintf(stderr, "Error: '.' after a digit must be followed by another digit\n");
                     exit(1);
                 }
-            case S_DOUBLE:
+            case S_DBL_DECIMAL:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
                     break;
                 }
                 else if (symbol == '_') {
-                    state = S_DBL_UNDERSCORE;
+                    state = S_DBL_DECIMAL_UNDERSCORE;
+                    break;
+                }
+                else if (symbol == 'e' || symbol == 'E') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_EXPONENT;
                     break;
                 }
                 else if (symbol != EOF && symbol != 'd' && symbol != 'D') {
@@ -377,10 +398,65 @@ token_t get_token() {
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
                 buffer_destruct(&number_buffer);
                 return token;
-            case S_DBL_UNDERSCORE:
+            case S_DBL_DECIMAL_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
-                    state = S_DOUBLE;
+                    state = S_DBL_DECIMAL;
+                    break;
+                }
+                else {
+                    buffer_destruct(&number_buffer);
+                    fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
+                    exit(1);
+                }
+            case S_EXPONENT:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DBL_EXP;
+                    break;
+                }
+                else if (symbol == '+' || symbol == '-') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DBL_EXP_SIGN;
+                    break;
+                }
+                else {
+                    buffer_destruct(&number_buffer);
+                    fprintf(stderr, "Error: Exponent must be followed by a digit or a sign\n");
+                    exit(1);
+                }
+            case S_DBL_EXP_SIGN:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DBL_EXP;
+                    break;
+                }
+                else {
+                    buffer_destruct(&number_buffer);
+                    fprintf(stderr, "Error: A sign in an exponent must be followed by a digit\n");
+                    exit(1);
+                }
+            case S_DBL_EXP:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    break;
+                }
+                else if (symbol == '_') {
+                    state = S_DBL_EXP_UNDERSCORE;
+                    break;
+                }
+                else if (symbol != EOF && symbol != 'd' && symbol != 'D'){
+                    ungetc(symbol, stdin);
+                }
+                add_symbol2buffer(&number_buffer, '\0');
+                token.type = TOKEN_DBL_LITERAL;
+                token.data.dbl_value = convert_str2dbl(number_buffer.data);
+                buffer_destruct(&number_buffer);
+                return token;
+            case S_DBL_EXP_UNDERSCORE:
+                if (symbol >= '0' && symbol <= '9') {
+                    add_symbol2buffer(&number_buffer, symbol);
+                    state = S_DBL_EXP;
                     break;
                 }
                 else {
