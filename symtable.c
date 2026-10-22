@@ -40,19 +40,24 @@ void delete_hashtable(hashtable* hstable)
     free(hstable);
 }
 
+/*
+    @brief Hash function using a djb2a algorithm
+    @param hash_value   Magic constant used in dj2ba
+
+*/
 size_t hash_function(hashtable* hstable, char* key)
 {
-    size_t ascii_addition = 0;
+    size_t hash_value = 5381;
 
-    int char_index = 0;
+    int char_index = 0; 
     while(key[char_index] != '\0')
     {
-        ascii_addition += key[char_index];
+        hash_value = ((hash_value * 33) ^ key[char_index]);
         char_index++;
     }
 
-    size_t hash_value = (ascii_addition % hstable->capacity);
-    return hash_value;
+    size_t hstable_index = (hash_value % (hstable->capacity - 1));
+    return hstable_index;
 }
 
 bool rehash_hashtable(hashtable* hstable)
