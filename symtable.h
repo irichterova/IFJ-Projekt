@@ -59,7 +59,7 @@ typedef struct
 {
     char* id;
     attributes* attribute;
-    int hash_value;
+    size_t hash_value;
     status state;
 
 }item;

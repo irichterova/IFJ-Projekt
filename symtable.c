@@ -34,9 +34,9 @@ bool hashtable_init(hashtable* hstable)
     return true;
 }
 
-int hash_function(hashtable* hstable, char* key)
+size_t hash_function(hashtable* hstable, char* key)
 {
-    int ascii_addition = 0;
+    size_t ascii_addition = 0;
 
     int char_index = 0;
     while(key[char_index] != '\0')
