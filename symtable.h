@@ -75,7 +75,7 @@ typedef struct hashtable
 
 }hashtable;
 
-int hash_function(hashtable* hstable, char* key);
+size_t hash_function(hashtable* hstable, char* key);
 bool hashtable_init(hashtable* hstable);
 bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);
