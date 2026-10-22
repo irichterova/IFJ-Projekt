@@ -34,6 +34,12 @@ bool hashtable_init(hashtable* hstable)
     return true;
 }
 
+void delete_hashtable(hashtable* hstable)
+{
+    free(hstable->item_array);
+    free(hstable);
+}
+
 size_t hash_function(hashtable* hstable, char* key)
 {
     size_t ascii_addition = 0;
