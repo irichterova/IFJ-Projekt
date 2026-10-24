@@ -5,7 +5,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26 code
 @file symtable.h 
 @brief header file for implementation of a hashtable 
 *
-@date 08-10-2026
+@date 24-10-2026
 @author xdongop00 Phuong Uyen Dongova
 *
 */
@@ -37,6 +37,14 @@ typedef enum
 
 }status;
 
+typedef enum 
+{
+    insert_ok,
+    insert_duplicate,
+    insert_fail,
+
+}insert_status;
+
 typedef enum  
 {
     nonmodif_val,
@@ -47,7 +55,7 @@ typedef enum
 typedef struct
 {
     param_type data_type;
-    val_var value;
+    val_var value_modif;
     bool main_flag;
     bool func_flag;
     param_type return_type;
@@ -80,7 +88,7 @@ bool hashtable_init(hashtable* hstable);
 bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);
 
-void insert_hash(item* item_to_insert, hashtable* hstable);
+insert_status insert_hash(hashtable* hstable, char* key, attributes* attr);
 int redirect_hash(item* item_to_redirect, hashtable* hstable);
 attributes* search_symbol(char* item_to_search, hashtable* hstable);
 bool tombstone_hash(item* item_to_tombs, hashtable* hstable);
