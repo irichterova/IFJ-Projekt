@@ -52,12 +52,19 @@ typedef enum
 
 }val_var;
 
+typedef enum 
+{
+    variable,
+    function,
+
+}type_of_symbol;
+
 typedef struct
 {
     param_type data_type;
     val_var value_modif;
     bool main_flag;
-    bool func_flag;
+    type_of_symbol symbol;
     param_type return_type;
     int num_of_param;
 
