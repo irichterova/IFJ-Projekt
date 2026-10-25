@@ -19,4 +19,12 @@ typedef enum {
     ERR_INTERNAL = 99
 } error_code;
 
+/**
+ * @brief exits program and writes to stderr with error code type when error occurs
+ * @param code what type of error happened
+ * @param line at what line error happened, if line number is lesser or equal to 0 then line is unknown
+ * @param fmt format of error, after this parameter can be any arguments
+ */
+void error_exit(error_code code, int line, const char *fmt, ...);
+
 #endif
