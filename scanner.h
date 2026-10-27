@@ -55,8 +55,8 @@ union token_data {
     int int_value;
     double dbl_value;
     char* str_value;
+    char* id;
     enum keywords_enum keyword;
-    // + symtable pointer
 };
 
 typedef struct token {

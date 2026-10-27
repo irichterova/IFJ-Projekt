@@ -22,6 +22,7 @@ enum states {
     S_INT,
     S_INT_UNDERSCORE,
     S_ZERO,
+    S_ZERO_UNDERSCORE,
     S_PERIOD,
     S_INT_PERIOD,
     S_DBL_DECIMAL,
@@ -275,11 +276,12 @@ token_t get_token() {
                 if (keyword != -1) {
                     token.type = TOKEN_KEYWORD;
                     token.data.keyword = keyword;
+                    buffer_destruct(&identif_buffer);
                 }
                 else {
                     token.type = TOKEN_IDENTIFIER;
+                    token.data.id = identif_buffer.data;
                 }
-                buffer_destruct(&identif_buffer);
                 return token;
             case S_ID_UNDERSCORE:
                 if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z') || 
@@ -326,6 +328,7 @@ token_t get_token() {
                     add_symbol2buffer(&number_buffer, symbol);
                     break;
                 }
+                else if (symbol == '_') break;
                 else {
                     buffer_destruct(&number_buffer);
                     fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
@@ -346,12 +349,31 @@ token_t get_token() {
                     state = S_EXPONENT;
                     break;
                 }
+                else if (symbol >= '1' && symbol <= '9') {
+                    fprintf(stderr, "Error: Nonzero literal can not begin with '0'\n");
+                    exit(1);
+                }
+                else if (symbol == '0') break;
+                else if (symbol == '_') {
+                    state = S_ZERO_UNDERSCORE;
+                    break;
+                }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
                 token.type = TOKEN_INT_LITERAL;
                 token.data.int_value = 0;
                 return token;
+            case S_ZERO_UNDERSCORE:
+                if (symbol == '0') {
+                    state = S_ZERO;
+                    break;
+                }
+                else if (symbol == '_') break;
+                else {
+                    fprintf(stderr, "Error: '_' in a zero literal must be followed by a '0'\n");
+                    exit(1);
+                }
             case S_PERIOD:
                 if (symbol >= '0' && symbol <= '9') {
                     buffer_init(&number_buffer);
@@ -404,6 +426,7 @@ token_t get_token() {
                     state = S_DBL_DECIMAL;
                     break;
                 }
+                else if (symbol == '_') break;
                 else {
                     buffer_destruct(&number_buffer);
                     fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
@@ -459,6 +482,7 @@ token_t get_token() {
                     state = S_DBL_EXP;
                     break;
                 }
+                else if (symbol == '_') break;
                 else {
                     buffer_destruct(&number_buffer);
                     fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
