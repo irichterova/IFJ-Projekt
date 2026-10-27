@@ -31,6 +31,8 @@ enum states {
     S_DBL_EXP,
     S_DBL_EXP_SIGN,
     S_DBL_EXP_UNDERSCORE,
+    S_STR,
+    S_ESC_SEQ,
 };
 
 char* keywords_arr[] = {
@@ -152,7 +154,7 @@ token_t get_token() {
     token_t token = {0};
     enum states state;
     state = S_START;
-    buffer_t identif_buffer, number_buffer;
+    buffer_t identif_buffer, number_buffer, string_buffer;
     while (1) {
         symbol = getchar();
         switch (state) {
@@ -222,6 +224,11 @@ token_t get_token() {
                     add_symbol2buffer(&number_buffer, symbol);
                 }
                 else if (symbol == '0') state = S_ZERO;
+                else if (symbol == '"') {
+                    state = S_STR;
+                    buffer_init(&string_buffer);
+                    add_symbol2buffer(&string_buffer, symbol);
+                }
                 break;
             case S_GT:
                 if (symbol == '=') {
@@ -486,6 +493,58 @@ token_t get_token() {
                 else {
                     buffer_destruct(&number_buffer);
                     fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
+                    exit(1);
+                }
+            case S_STR:
+                if (symbol == '\\') {
+                    state = S_ESC_SEQ;
+                    break;
+                }
+                else if (symbol == '"') {
+                    add_symbol2buffer(&string_buffer, symbol);
+                    add_symbol2buffer(&string_buffer, '\0');
+                    token.type = TOKEN_STR_LITERAL;
+                    token.data.str_value = string_buffer.data;
+                    return token;
+                }
+                else if (symbol == '\n' || symbol == EOF) {
+                    buffer_destruct(&string_buffer);
+                    fprintf(stderr, "Error");
+                    exit(1);
+                }
+                else {
+                    add_symbol2buffer(&string_buffer, symbol);
+                    break;
+                }
+            case S_ESC_SEQ:
+                if (symbol == '\\') {
+                    add_symbol2buffer(&string_buffer, '\\');
+                    state = S_STR;
+                    break;
+                }
+                else if (symbol == '"') {
+                    add_symbol2buffer(&string_buffer, '"');
+                    state = S_STR;
+                    break;
+                }
+                else if (symbol == 'n') {
+                    add_symbol2buffer(&string_buffer, '\n');
+                    state = S_STR;
+                    break;
+                }
+                else if (symbol == 'r') {
+                    add_symbol2buffer(&string_buffer, '\r');
+                    state = S_STR;
+                    break;
+                }
+                else if (symbol == 't') {
+                    add_symbol2buffer(&string_buffer, '\t');
+                    state = S_STR;
+                    break;
+                }
+                else {
+                    buffer_destruct(&string_buffer);
+                    fprintf(stderr, "Error: Unsupported escape sequence\n");
                     exit(1);
                 }
         }
