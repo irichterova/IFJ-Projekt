@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -39,6 +40,9 @@ enum states {
     S_MULTI_LN_STR_END1,
     S_MULTI_LN_STR_END2,
     S_LINE_COM,
+    S_BLOCK_COM,
+    S_BLOCK_COM_END,
+    S_NESTED_COM,
 };
 
 char* keywords_arr[] = {
@@ -161,6 +165,8 @@ token_t get_token() {
     enum states state;
     state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
+    int unended_com_cnt = 0;
+    bool new_line = false;
     while (1) {
         symbol = getchar();
         switch (state) {
@@ -508,7 +514,7 @@ token_t get_token() {
                 }
                 else if (symbol == '\n' || symbol == EOF) {
                     buffer_destruct(&string_buffer);
-                    fprintf(stderr, "Error");
+                    fprintf(stderr, "Error: String not ended correctly\n");
                     exit(1);
                 }
                 else {
@@ -599,6 +605,11 @@ token_t get_token() {
                         state = S_LINE_COM;
                         break;
                     }
+                    else if (symbol == '*') {
+                        state = S_BLOCK_COM;
+                        unended_com_cnt++;
+                        break;
+                    }
                     else if (symbol != EOF) {
                         ungetc (symbol, stdin);
                     }
@@ -610,6 +621,64 @@ token_t get_token() {
                         return token;
                     }
                     else break;
+                case S_BLOCK_COM:
+                    if (symbol == '*') {
+                        state = S_BLOCK_COM_END;
+                        break;
+                    }
+                    else if (symbol == '/') {
+                        state = S_NESTED_COM;
+                        break;
+                    }
+                    else if (symbol == EOF) {
+                        fprintf(stderr, "Error: Block comment ended incorrectly\n");
+                        exit(1);
+                    }
+                    else if (symbol == '\n') {
+                        new_line = true;
+                        break;
+                    }
+                    else break;
+                case S_BLOCK_COM_END:
+                    if (symbol == '/') {
+                        unended_com_cnt--;
+                        if (unended_com_cnt == 0) {
+                            if (new_line) {
+                                token.type = TOKEN_NL;
+                                return token;
+                            }
+                            else {
+                                state = S_START;
+                                break;
+                            }
+                        }
+                    }
+                    else if (symbol == '*') break;
+                    else if (symbol == EOF) {
+                        fprintf(stderr, "Error: Block comment ended incorrectly\n");
+                        exit(1);
+                    }
+                    else if (symbol == '\n') {
+                        new_line = true;
+                    }
+                    state = S_BLOCK_COM;
+                    break;
+                case S_NESTED_COM:
+                    if (symbol == '*') {
+                        unended_com_cnt++;
+                        state = S_BLOCK_COM;
+                        break;
+                    }
+                    if (symbol == '/') break;
+                    else if (symbol == EOF) {
+                        fprintf(stderr, "Error: Block comment ended incorrectly\n");
+                        exit(1);
+                    }
+                    else if (symbol == '\n') {
+                        new_line = true;
+                    }
+                    state = S_BLOCK_COM;
+                    break;
         }
     }
 }
