@@ -86,13 +86,14 @@ void delete_hashtable(hashtable* hstable)
 }
 
 /*
-    @brief Hash function using a djb2a algorithm
-    @param hash_value   Magic constant used in dj2ba
-
+    @brief  Convert the key of an item into a hash value with djb2a algorithm
+    @param  hstable Pointer to a hashtable stucture
+    @param  key     Id of an item
+    @return hash index calculated from the hash value of an item
 */
-size_t hash_function(hashtable* hstable, char* key)
+size_t hash_function(size_t hstable_capacity, char* key)
 {
-    size_t hash_value = 5381;
+    size_t hash_value = 5381;   //Magic constant being used in djb2a algorithm 
 
     int char_index = 0; 
     while(key[char_index] != '\0')
@@ -101,10 +102,15 @@ size_t hash_function(hashtable* hstable, char* key)
         char_index++;
     }
 
-    size_t hstable_index = (hash_value % (hstable->capacity));
+    size_t hstable_index = (hash_value % (hstable_capacity));
     return hstable_index;
 }
 
+/*
+    @brief Expansion of the hashtable when used capacity is over 50%, rehashing all items to new slot in array based on new index
+    @param hstable  Pointer to a hashtable structure
+    @return true when the expansion is succesful, false when the expansion fails
+*/
 bool rehash_hashtable(hashtable* hstable)
 {
     size_t rehashed_capacity = hstable->capacity*2;
@@ -116,14 +122,15 @@ bool rehash_hashtable(hashtable* hstable)
         return false;
     }
 
-    for(int i = 0; i < hstable->capacity; i++)
+    for(size_t item_index = 0; item_index < hstable->capacity; item_index++)
     {
-        if(hstable->item_array[i].state == 2)
+        if(hstable->item_array[item_index].state == 2)
         {
-            rehashed_array[hash_function(rehashed_array, hstable->item_array[i].id)] = hstable->item_array[i];
+            size_t new_index = hash_function(rehashed_capacity, hstable->item_array[item_index].id);
+            rehashed_array[new_index] = hstable->item_array[item_index];
         }
         
-        else
+        else 
         continue;
     }
 
