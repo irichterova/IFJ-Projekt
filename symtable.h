@@ -91,6 +91,7 @@ typedef struct hashtable
 }hashtable;
 
 size_t hash_function(hashtable* hstable, char* key);
+hashtable* create_hashtable(void);
 bool hashtable_init(hashtable* hstable);
 bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);

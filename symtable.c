@@ -9,6 +9,29 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 
 #include "symtable.h"
 
+/*
+    @brief  Create and initialize the structure of a hashtable, including the array
+    @return A valid pointer to an initialized hashtable structure or NULL when allocation/initialization fails
+*/
+hashtable* create_hashtable(void)
+{
+    hashtable* hstable = (hashtable*) malloc(sizeof(hashtable));
+    if(hstable == NULL)
+    {
+        fprintf(stderr, "Hashtable allocation failed.\n");
+        return NULL;
+    }
+
+    if(!hashtable_init(hstable))
+    {
+        fprintf(stderr, "Hashtable initialization failed.\n");
+        free(hstable);
+        return NULL;
+    }
+
+    return hstable;
+}
+
 /* 
     @brief Initialization of a hashtable 
     @param hstable  Valid pointer to an unitialized hashtable structure
@@ -25,7 +48,6 @@ bool hashtable_init(hashtable* hstable)
         hstable->used_slots = 0;
         hstable->tombstoned_slots = 0;
         hstable->parent = NULL;
-        fprintf(stderr, "Hashtable allocation failed.\n");
         return false;
     }
 
@@ -50,7 +72,7 @@ void delete_hashtable(hashtable* hstable)
         return;
     }
 
-    for(int item_index = 0; item_index < hstable->capacity; item_index++)
+    for(size_t item_index = 0; item_index < hstable->capacity; item_index++)
     {
         item *current = &hstable->item_array[item_index];
         if(current->state == 2)
