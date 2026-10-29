@@ -17,6 +17,7 @@ enum states {
     S_LT,
     S_ASSIGN,
     S_NOT,
+    S_DIV,
     S_IDENTIF,
     S_ID_UNDERSCORE,
     S_INT,
@@ -36,7 +37,8 @@ enum states {
     S_STR_END,
     S_MULTI_LN_STR,
     S_MULTI_LN_STR_END1,
-    S_MULTI_LN_STR_END2
+    S_MULTI_LN_STR_END2,
+    S_LINE_COM,
 };
 
 char* keywords_arr[] = {
@@ -208,10 +210,7 @@ token_t get_token() {
                     token.type = TOKEN_OP_MUL;
                     return token;
                 }
-                else if (symbol == '/') {
-                    token.type = TOKEN_OP_DIV;
-                    return token;
-                }
+                else if (symbol == '/') state = S_DIV;
                 else if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z')) {
                     state = S_IDENTIF;
                     buffer_init(&identif_buffer);
@@ -595,6 +594,22 @@ token_t get_token() {
                         fprintf(stderr, "Error: String not ended correctly\n");
                         exit(1);
                     }
+                case S_DIV:
+                    if (symbol == '/') {
+                        state = S_LINE_COM;
+                        break;
+                    }
+                    else if (symbol != EOF) {
+                        ungetc (symbol, stdin);
+                    }
+                    token.type = TOKEN_OP_DIV;
+                    return token;
+                case S_LINE_COM:
+                    if (symbol == '\n' || symbol == EOF) {
+                        token.type = TOKEN_NL;
+                        return token;
+                    }
+                    else break;
         }
     }
 }
