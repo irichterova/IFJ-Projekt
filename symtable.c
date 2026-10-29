@@ -2,7 +2,6 @@
 IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 *
 @file symtable.c
-@brief 
 *
 @date 17-10-2026
 @author xdongop00 Phuong Uyen Dongova
@@ -39,8 +38,27 @@ bool hashtable_init(hashtable* hstable)
     return true;
 }
 
+/*
+    @brief  Free attributes and id's of items in item array, free the item array and hashtable
+    @param  hstable Valid pointer to a hashtable structure, initialized by function hashtable_init
+*/
 void delete_hashtable(hashtable* hstable)
 {
+    if(hstable == NULL)
+    {
+        free(hstable);
+        return;
+    }
+
+    for(int item_index = 0; item_index < hstable->capacity; item_index++)
+    {
+        item *current = &hstable->item_array[item_index];
+        if(current->state == 2)
+        {
+            free(current->attribute);
+            free(current->id);
+        }
+    }
     free(hstable->item_array);
     free(hstable);
 }
