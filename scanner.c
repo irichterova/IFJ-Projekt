@@ -33,6 +33,10 @@ enum states {
     S_DBL_EXP_UNDERSCORE,
     S_STR,
     S_ESC_SEQ,
+    S_STR_END,
+    S_MULTI_LN_STR,
+    S_MULTI_LN_STR_END1,
+    S_MULTI_LN_STR_END2
 };
 
 char* keywords_arr[] = {
@@ -227,7 +231,6 @@ token_t get_token() {
                 else if (symbol == '"') {
                     state = S_STR;
                     buffer_init(&string_buffer);
-                    add_symbol2buffer(&string_buffer, symbol);
                 }
                 break;
             case S_GT:
@@ -501,11 +504,8 @@ token_t get_token() {
                     break;
                 }
                 else if (symbol == '"') {
-                    add_symbol2buffer(&string_buffer, symbol);
-                    add_symbol2buffer(&string_buffer, '\0');
-                    token.type = TOKEN_STR_LITERAL;
-                    token.data.str_value = string_buffer.data;
-                    return token;
+                    state = S_STR_END;
+                    break;
                 }
                 else if (symbol == '\n' || symbol == EOF) {
                     buffer_destruct(&string_buffer);
@@ -547,6 +547,54 @@ token_t get_token() {
                     fprintf(stderr, "Error: Unsupported escape sequence\n");
                     exit(1);
                 }
+                case S_STR_END:
+                    if (symbol == '"') {
+                        state = S_MULTI_LN_STR;
+                        break;
+                    }
+                    else if (symbol != EOF) {
+                        ungetc(symbol, stdin);
+                    }
+                    add_symbol2buffer(&string_buffer, '\0');
+                    token.type = TOKEN_STR_LITERAL;
+                    token.data.str_value = string_buffer.data;
+                    return token;
+                case S_MULTI_LN_STR:
+                    if (symbol == EOF) {
+                        buffer_destruct(&string_buffer);
+                        fprintf(stderr, "Error: String not ended correctly\n");
+                        exit(1);
+                    }
+                    else if (symbol == '"') {
+                        state = S_MULTI_LN_STR_END1;
+                        break;
+                    }
+                    else {
+                        add_symbol2buffer(&string_buffer, symbol);
+                        break;
+                    }
+                case S_MULTI_LN_STR_END1:
+                    if (symbol == '"') {
+                        state = S_MULTI_LN_STR_END2;
+                        break;
+                    }
+                    else {
+                        buffer_destruct(&string_buffer);
+                        fprintf(stderr, "Error: String not ended correctly\n");
+                        exit(1);
+                    }
+                case S_MULTI_LN_STR_END2:
+                    if (symbol == '"') {
+                        add_symbol2buffer(&string_buffer, '\0');
+                        token.type = TOKEN_STR_LITERAL;
+                        token.data.str_value = string_buffer.data;
+                        return token;
+                    }
+                    else {
+                        buffer_destruct(&string_buffer);
+                        fprintf(stderr, "Error: String not ended correctly\n");
+                        exit(1);
+                    }
         }
     }
 }
