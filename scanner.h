@@ -32,7 +32,6 @@ enum token_types {
     TOKEN_PERIOD,
     TOKEN_AT,
     TOKEN_EOF,
-    TOKEN_NL,
 };
 
 enum keywords_enum {
@@ -52,6 +51,12 @@ enum keywords_enum {
     KEYWORD_WHILE,
 };
 
+enum eol_rules {
+    EOL_REQUIRED,
+    EOL_OPTIONAL,
+    EOL_FORBIDDEN,
+};
+
 union token_data {
     int int_value;
     double dbl_value;
@@ -65,6 +70,6 @@ typedef struct token {
     union token_data data;
 } token_t;
 
-token_t get_token();
+token_t get_token(enum eol_rules rule);
 
 #endif
