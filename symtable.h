@@ -90,7 +90,7 @@ typedef struct hashtable
 
 }hashtable;
 
-size_t hash_function(size_t hstable_capcacity, char* key);
+size_t hash_function(size_t hstable_capacity, char* key);
 hashtable* create_hashtable(void);
 bool hashtable_init(hashtable* hstable);
 bool rehash_hashtable(hashtable* hstable);

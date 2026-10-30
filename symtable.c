@@ -8,6 +8,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 */
 
 #include "symtable.h"
+#include <string.h>
 
 /*
     @brief  Create and initialize the structure of a hashtable, including the array
@@ -75,7 +76,7 @@ void delete_hashtable(hashtable* hstable)
     for(size_t item_index = 0; item_index < hstable->capacity; item_index++)
     {
         item *current = &hstable->item_array[item_index];
-        if(current->state == 2)
+        if(current->state == slot_taken)
         {
             free(current->attribute);
             free(current->id);
@@ -124,7 +125,7 @@ bool rehash_hashtable(hashtable* hstable)
 
     for(size_t item_index = 0; item_index < hstable->capacity; item_index++)
     {
-        if(hstable->item_array[item_index].state == 2)
+        if(hstable->item_array[item_index].state == slot_taken)
         {
             size_t new_index = hash_function(rehashed_capacity, hstable->item_array[item_index].id);
             rehashed_array[new_index] = hstable->item_array[item_index];
@@ -139,4 +140,39 @@ bool rehash_hashtable(hashtable* hstable)
     hstable->item_array = rehashed_array;
 
     return true;
+}
+
+insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
+{
+    if(hstable->used_slots >= hstable->capacity/2 || hstable->available_slots == 0)
+    {
+        rehash_hashtable(hstable);
+    }
+    
+    size_t item_index = hash_function(hstable->capacity, key);
+
+    if(hstable->item_array[item_index].state == slot_taken)
+    {
+        if(strcmp(hstable->item_array[item_index].id, key) == 0)
+        {
+            return insert_duplicate;
+        }
+        else 
+        redirect_hash(&hstable->item_array[item_index], hstable);
+    }
+
+    char *item_key = malloc((strlen(key) + 1) * sizeof(char));
+    if(item_key == NULL)
+    {
+        return insert_fail;
+    } 
+    memcpy(item_key, key, (strlen(key) + 1) * sizeof(char));
+
+    attributes *item_attribute = malloc (sizeof(attributes));
+    if(item_attribute == NULL)
+    {
+        free(item_key);
+        return insert_fail;
+    }
+    *item_attribute = *attr;
 }
