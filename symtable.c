@@ -149,17 +149,38 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         rehash_hashtable(hstable);
     }
     
-    size_t item_index = hash_function(hstable->capacity, key);
+    size_t hash_index = hash_function(hstable->capacity, key);
+    size_t tombstone_index = 0;
+    bool tombstone_found = false;
+    size_t item_index = 0;
+    bool slot_found = false;
 
-    if(hstable->item_array[item_index].state == slot_taken)
+    size_t item_count = 0;
+
+    for(size_t index = 0; index < hstable->capacity; index++)
     {
-        if(strcmp(hstable->item_array[item_index].id, key) == 0)
+        item_count = (hash_index + index) % hstable->capacity;
+
+        if(hstable->item_array[item_count].state == slot_taken)
         {
-            return insert_duplicate;
+            if(strcmp(hstable->item_array[item_count].id, key) == 0)
+            {
+                return insert_duplicate;
+            }
         }
-        else 
-        redirect_hash(&hstable->item_array[item_index], hstable);
+        if(hstable->item_array[item_count].state == slot_tombstoned && !(tombstone_found))
+        {
+            tombstone_index = item_count;
+            tombstone_found = true;
+        }
+        if(hstable->item_array[item_count].state == slot_available)
+        {
+            item_index = item_count;
+            slot_found = true;
+            break;
+        }
     }
+    
 
     char *item_key = malloc((strlen(key) + 1) * sizeof(char));
     if(item_key == NULL)
@@ -175,4 +196,15 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         return insert_fail;
     }
     *item_attribute = *attr;
+
+    /*
+    if(tombstone_index != NULL)
+    {
+        hstable->item_array[tombstone_index].id = item_key;
+        hstable->item_array[tombstone_index].attribute = item_attribute;
+        hstable->item_array[tombstone_index].state = slot_taken;
+        
+        return insert_ok;
+    }
+    */
 }
