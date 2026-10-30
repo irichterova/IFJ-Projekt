@@ -167,6 +167,7 @@ token_t get_token() {
     buffer_t identif_buffer, number_buffer, string_buffer;
     int unended_com_cnt = 0;
     bool new_line = false;
+    bool empty_string = true;
     while (1) {
         symbol = getchar();
         switch (state) {
@@ -505,12 +506,21 @@ token_t get_token() {
                 }
             case S_STR:
                 if (symbol == '\\') {
+                    empty_string = false;
                     state = S_ESC_SEQ;
                     break;
                 }
                 else if (symbol == '"') {
-                    state = S_STR_END;
-                    break;
+                    if (!empty_string) {
+                        add_symbol2buffer(&string_buffer, '\0');
+                        token.type = TOKEN_STR_LITERAL;
+                        token.data.str_value = string_buffer.data;
+                        return token;
+                    }
+                    else {
+                        state = S_STR_END;
+                        break;
+                    }
                 }
                 else if (symbol == '\n' || symbol == EOF) {
                     buffer_destruct(&string_buffer);
@@ -518,6 +528,7 @@ token_t get_token() {
                     exit(1);
                 }
                 else {
+                    empty_string = false;
                     add_symbol2buffer(&string_buffer, symbol);
                     break;
                 }
@@ -552,133 +563,146 @@ token_t get_token() {
                     fprintf(stderr, "Error: Unsupported escape sequence\n");
                     exit(1);
                 }
-                case S_STR_END:
-                    if (symbol == '"') {
-                        state = S_MULTI_LN_STR;
-                        break;
-                    }
-                    else if (symbol != EOF) {
-                        ungetc(symbol, stdin);
-                    }
+            case S_STR_END:
+                if (symbol == '"') {
+                    state = S_MULTI_LN_STR;
+                    break;
+                }
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                add_symbol2buffer(&string_buffer, '\0');
+                token.type = TOKEN_STR_LITERAL;
+                token.data.str_value = string_buffer.data;
+                return token;
+            case S_MULTI_LN_STR:
+                if (symbol == EOF) {
+                    buffer_destruct(&string_buffer);
+                    fprintf(stderr, "Error: String not ended correctly\n");
+                    exit(1);
+                }
+                else if (symbol == '"') {
+                    state = S_MULTI_LN_STR_END1;
+                    break;
+                }
+                else {
+                    add_symbol2buffer(&string_buffer, symbol);
+                    break;
+                }
+            case S_MULTI_LN_STR_END1:
+                if (symbol == '"') {
+                    state = S_MULTI_LN_STR_END2;
+                    break;
+                }
+                else if (symbol != EOF) {
+                    add_symbol2buffer(&string_buffer, '"');
+                    add_symbol2buffer(&string_buffer, symbol);
+                    state = S_MULTI_LN_STR;
+                    break;
+                }
+                else {
+                    buffer_destruct(&string_buffer);
+                    fprintf(stderr, "Error: String not ended correctly\n");
+                    exit(1);
+                }
+            case S_MULTI_LN_STR_END2:
+                if (symbol == '"') {
                     add_symbol2buffer(&string_buffer, '\0');
                     token.type = TOKEN_STR_LITERAL;
                     token.data.str_value = string_buffer.data;
                     return token;
-                case S_MULTI_LN_STR:
-                    if (symbol == EOF) {
-                        buffer_destruct(&string_buffer);
-                        fprintf(stderr, "Error: String not ended correctly\n");
-                        exit(1);
-                    }
-                    else if (symbol == '"') {
-                        state = S_MULTI_LN_STR_END1;
-                        break;
-                    }
-                    else {
-                        add_symbol2buffer(&string_buffer, symbol);
-                        break;
-                    }
-                case S_MULTI_LN_STR_END1:
-                    if (symbol == '"') {
-                        state = S_MULTI_LN_STR_END2;
-                        break;
-                    }
-                    else {
-                        buffer_destruct(&string_buffer);
-                        fprintf(stderr, "Error: String not ended correctly\n");
-                        exit(1);
-                    }
-                case S_MULTI_LN_STR_END2:
-                    if (symbol == '"') {
-                        add_symbol2buffer(&string_buffer, '\0');
-                        token.type = TOKEN_STR_LITERAL;
-                        token.data.str_value = string_buffer.data;
-                        return token;
-                    }
-                    else {
-                        buffer_destruct(&string_buffer);
-                        fprintf(stderr, "Error: String not ended correctly\n");
-                        exit(1);
-                    }
-                case S_DIV:
-                    if (symbol == '/') {
-                        state = S_LINE_COM;
-                        break;
-                    }
-                    else if (symbol == '*') {
-                        state = S_BLOCK_COM;
-                        unended_com_cnt++;
-                        break;
-                    }
-                    else if (symbol != EOF) {
-                        ungetc (symbol, stdin);
-                    }
-                    token.type = TOKEN_OP_DIV;
+                }
+                else if (symbol != EOF) {
+                    add_symbol2buffer(&string_buffer, '"');
+                    add_symbol2buffer(&string_buffer, '"');
+                    add_symbol2buffer(&string_buffer, symbol);
+                    state = S_MULTI_LN_STR;
+                    break;
+                }
+                else {
+                    buffer_destruct(&string_buffer);
+                    fprintf(stderr, "Error: String not ended correctly\n");
+                    exit(1);
+                }
+            case S_DIV:
+                if (symbol == '/') {
+                    state = S_LINE_COM;
+                    break;
+                }
+                else if (symbol == '*') {
+                    state = S_BLOCK_COM;
+                    unended_com_cnt++;
+                    break;
+                }
+                else if (symbol != EOF) {
+                    ungetc (symbol, stdin);
+                }
+                token.type = TOKEN_OP_DIV;
+                return token;
+            case S_LINE_COM:
+                if (symbol == '\n' || symbol == EOF) {
+                    token.type = TOKEN_NL;
                     return token;
-                case S_LINE_COM:
-                    if (symbol == '\n' || symbol == EOF) {
-                        token.type = TOKEN_NL;
-                        return token;
-                    }
-                    else break;
-                case S_BLOCK_COM:
-                    if (symbol == '*') {
-                        state = S_BLOCK_COM_END;
-                        break;
-                    }
-                    else if (symbol == '/') {
-                        state = S_NESTED_COM;
-                        break;
-                    }
-                    else if (symbol == EOF) {
-                        fprintf(stderr, "Error: Block comment ended incorrectly\n");
-                        exit(1);
-                    }
-                    else if (symbol == '\n') {
-                        new_line = true;
-                        break;
-                    }
-                    else break;
-                case S_BLOCK_COM_END:
-                    if (symbol == '/') {
-                        unended_com_cnt--;
-                        if (unended_com_cnt == 0) {
-                            if (new_line) {
-                                token.type = TOKEN_NL;
-                                return token;
-                            }
-                            else {
-                                state = S_START;
-                                break;
-                            }
+                }
+                else break;
+            case S_BLOCK_COM:
+                if (symbol == '*') {
+                    state = S_BLOCK_COM_END;
+                    break;
+                }
+                else if (symbol == '/') {
+                    state = S_NESTED_COM;
+                    break;
+                }
+                else if (symbol == EOF) {
+                    fprintf(stderr, "Error: Block comment ended incorrectly\n");
+                    exit(1);
+                }
+                else if (symbol == '\n') {
+                    new_line = true;
+                    break;
+                }
+                else break;
+            case S_BLOCK_COM_END:
+                if (symbol == '/') {
+                    unended_com_cnt--;
+                    if (unended_com_cnt == 0) {
+                        if (new_line) {
+                            token.type = TOKEN_NL;
+                            return token;
+                        }
+                        else {
+                            state = S_START;
+                            break;
                         }
                     }
-                    else if (symbol == '*') break;
-                    else if (symbol == EOF) {
-                        fprintf(stderr, "Error: Block comment ended incorrectly\n");
-                        exit(1);
-                    }
-                    else if (symbol == '\n') {
-                        new_line = true;
-                    }
+                }
+                else if (symbol == '*') break;
+                else if (symbol == EOF) {
+                    fprintf(stderr, "Error: Block comment ended incorrectly\n");
+                    exit(1);
+                }
+                else if (symbol == '\n') {
+                    new_line = true;
+                }
+                state = S_BLOCK_COM;
+                break;
+            case S_NESTED_COM:
+                if (symbol == '*') {
+                    unended_com_cnt++;
                     state = S_BLOCK_COM;
                     break;
-                case S_NESTED_COM:
-                    if (symbol == '*') {
-                        unended_com_cnt++;
-                        state = S_BLOCK_COM;
-                        break;
-                    }
-                    if (symbol == '/') break;
-                    else if (symbol == EOF) {
-                        fprintf(stderr, "Error: Block comment ended incorrectly\n");
-                        exit(1);
-                    }
-                    else if (symbol == '\n') {
-                        new_line = true;
-                    }
-                    state = S_BLOCK_COM;
-                    break;
+                }
+                if (symbol == '/') break;
+                else if (symbol == EOF) {
+                    fprintf(stderr, "Error: Block comment ended incorrectly\n");
+                    exit(1);
+                }
+                else if (symbol == '\n') {
+                    new_line = true;
+                }
+                state = S_BLOCK_COM;
+                break;
         }
     }
 }
