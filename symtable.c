@@ -142,11 +142,23 @@ bool rehash_hashtable(hashtable* hstable)
     return true;
 }
 
+/*
+    @brief  Insert item into the hashtable
+    @param  hstable Pointer to a hashtable structure
+    @param  key     Key of an item, in this case the Id
+    @param  attr    Attributes of an item 
+    @return insert_fail when insert fails for any of these reasons : expansion of hashtable is unsuccesful, 
+                        allocation of a key or attributes fails, there is no available slot for the item / the hashtable is full 
+    @return insert_duplicate    when trying to insert an item that is already in the hashtable
+    @return insert_ok   when insert item succeeds 
+
+*/
 insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
 {
     if(hstable->used_slots >= hstable->capacity/2 || hstable->available_slots == 0)
     {
-        rehash_hashtable(hstable);
+        if(!rehash_hashtable(hstable))
+        return insert_fail;
     }
     
     size_t hash_index = hash_function(hstable->capacity, key);
@@ -157,6 +169,10 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
 
     size_t item_count = 0;
 
+    /* Search for an available slot based on the computed hash index, ensuring circularity of the hashtable (after end -> beginning) 
+        If the computed slot is taken, then it is either taken by the same item, that was already inserted -> return duplicate
+        or it is taken by another item -> a cycle finds another spot using the linear algorithm of moving to next slot, 
+        until it finds an available one */
     for(size_t index = 0; index < hstable->capacity; index++)
     {
         item_count = (hash_index + index) % hstable->capacity;
@@ -168,11 +184,14 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
                 return insert_duplicate;
             }
         }
+        /* If the current computed slot is tombstoned and is the first tombstoned slot we found, save the index and use it later to insert the item 
+        to this slot */
         if(hstable->item_array[item_count].state == slot_tombstoned && !(tombstone_found))
         {
             tombstone_index = item_count;
             tombstone_found = true;
         }
+        /* If the current computed slot is available save the index and break out of the loop */
         if(hstable->item_array[item_count].state == slot_available)
         {
             item_index = item_count;
@@ -180,7 +199,11 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
             break;
         }
     }
-    
+
+    if(!tombstone_found && !slot_found)
+    {
+        return insert_fail;
+    }
 
     char *item_key = malloc((strlen(key) + 1) * sizeof(char));
     if(item_key == NULL)
@@ -197,14 +220,26 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
     }
     *item_attribute = *attr;
 
-    /*
-    if(tombstone_index != NULL)
+    /* If we found a tombstone slot during the loop, we insert the item to this slot with the index of the first tombstone */
+    if(tombstone_found)
     {
         hstable->item_array[tombstone_index].id = item_key;
         hstable->item_array[tombstone_index].attribute = item_attribute;
         hstable->item_array[tombstone_index].state = slot_taken;
-        
+        hstable->tombstoned_slots--;
+        hstable->used_slots++;
         return insert_ok;
     }
-    */
+    /* If an available slot was found for the item and there wasnt tombstone before, we insert the item to this slot with the index we saved*/
+    else if(slot_found)
+    {
+        hstable->item_array[item_index].id = item_key;
+        hstable->item_array[item_index].attribute = item_attribute;
+        hstable->item_array[item_index].state = slot_taken;
+        hstable->used_slots++;
+        return insert_ok;
+    }
+    return insert_fail;
 }
+
+
