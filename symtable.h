@@ -26,6 +26,7 @@ typedef enum
     string_dt,
     bool_dt,
     unit_dt,
+    any_dt,
 
 }param_type;
 
@@ -64,6 +65,7 @@ typedef struct
     param_type data_type;
     val_var value_modif;
     bool main_flag;
+    bool function_flag;
     type_of_symbol symbol;
     param_type return_type;
     size_t num_of_param;
@@ -97,7 +99,7 @@ bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);
 
 insert_status insert_hash(hashtable* hstable, char* key, attributes* attr);
-attributes* search_symbol(char* item_to_search, hashtable* hstable);
+attributes* search_symbol(hashtable* hstable, char* key);
 bool tombstone_hash(item* item_to_tombs, hashtable* hstable);
 
 #endif

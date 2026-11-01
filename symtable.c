@@ -248,4 +248,38 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
     return insert_fail;
 }
 
+/*
+    @brief  Search item(symbol) to check if it is in the hashtable and get the item attributes
+    @param  hstable Pointer to a hashtable structure
+    @param  key     A key of an item / the identification of the item 
+    @return A pointer to the item attributes if the item is found, NULL if the item is not found
+*/
+attributes* search_symbol(hashtable* hstable, char* key)
+{
+    if(key == NULL || hstable == NULL)
+    {
+        return NULL;
+    }
 
+    size_t hash_index = hash_function(hstable->capacity, key);
+   
+    for(size_t index = 0; index < hstable->capacity; index++)
+    {
+        size_t item_count = (hash_index + index) % hstable->capacity;
+
+        if(hstable->item_array[item_count].state == slot_available)
+        {
+            return NULL;
+        }
+
+        if(hstable->item_array[item_count].state == slot_taken)
+        {
+            if(strcmp(hstable->item_array[item_count].id, key) == 0 )
+            {
+                return hstable->item_array[item_count].attribute;
+            }
+        }
+    }
+
+    return NULL;
+}
