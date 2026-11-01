@@ -224,6 +224,33 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
     }
     memcpy(item_attribute, attr, sizeof(attributes));
 
+    if(attr->symbol == variable)
+    {
+        item_attribute->num_of_param = 0;
+        item_attribute->param_type_array = NULL;
+    }
+
+    if(attr->symbol == function)
+    {
+        if(attr->num_of_param > 0)
+        {
+            param_type *param_array = malloc(attr->num_of_param * sizeof(param_type));
+            if(param_array == NULL)
+            {
+                free(item_key);
+                free(item_attribute);
+                return insert_fail;
+            }
+            memcpy(param_array, attr->param_type_array, attr->num_of_param * sizeof(param_type));
+            item_attribute->param_type_array = param_array;
+        }
+        else
+        {
+        item_attribute->param_type_array = NULL;
+        }
+    }
+
+
     /* If we found a tombstone slot during the loop, we insert the item to this slot with the index of the first tombstone */
     if(tombstone_found)
     {
@@ -242,7 +269,7 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         hstable->item_array[item_index].attribute = item_attribute;
         hstable->item_array[item_index].state = slot_taken;
         hstable->used_slots++;
-        hstable->available_slots = hstable->available_slots - hstable->used_slots;
+        hstable->available_slots = hstable->capacity - hstable->used_slots;
         return insert_ok;
     }
     return insert_fail;
