@@ -160,6 +160,10 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         if(!rehash_hashtable(hstable))
         return insert_fail;
     }
+    if(key == NULL || attr == NULL)
+    {
+        return insert_fail;
+    }
     
     size_t hash_index = hash_function(hstable->capacity, key);
     size_t tombstone_index = 0;
@@ -218,7 +222,7 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         free(item_key);
         return insert_fail;
     }
-    *item_attribute = *attr;
+    memcpy(item_attribute, attr, sizeof(attributes));
 
     /* If we found a tombstone slot during the loop, we insert the item to this slot with the index of the first tombstone */
     if(tombstone_found)
@@ -228,6 +232,7 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         hstable->item_array[tombstone_index].state = slot_taken;
         hstable->tombstoned_slots--;
         hstable->used_slots++;
+        hstable->available_slots = hstable->capacity - hstable->used_slots;
         return insert_ok;
     }
     /* If an available slot was found for the item and there wasnt tombstone before, we insert the item to this slot with the index we saved*/
@@ -237,6 +242,7 @@ insert_status insert_hash(hashtable* hstable, char* key, attributes* attr)
         hstable->item_array[item_index].attribute = item_attribute;
         hstable->item_array[item_index].state = slot_taken;
         hstable->used_slots++;
+        hstable->available_slots = hstable->available_slots - hstable->used_slots;
         return insert_ok;
     }
     return insert_fail;
