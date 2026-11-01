@@ -20,4 +20,17 @@ typedef enum {
     EXPR_CALL_FUNC
 } expr_node_type;
 
+typedef union {
+    int lit_int;
+    double lit_double;
+    char *lit_string;
+    char *variable;
+} expr_data;
+
+typedef struct expr_struct {
+    expr_node_type n_type;
+    value_type v_type;
+    expr_data data;
+} expr_struct;
+
 #endif
