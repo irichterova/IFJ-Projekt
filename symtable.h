@@ -97,7 +97,6 @@ bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);
 
 insert_status insert_hash(hashtable* hstable, char* key, attributes* attr);
-int redirect_hash(item* item_to_redirect, hashtable* hstable);
 attributes* search_symbol(char* item_to_search, hashtable* hstable);
 bool tombstone_hash(item* item_to_tombs, hashtable* hstable);
 
