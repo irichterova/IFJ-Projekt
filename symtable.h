@@ -65,10 +65,12 @@ typedef struct
     param_type data_type;
     val_var value_modif;
     bool main_flag;
-    bool function_flag;
+    bool builtin_flag;
     type_of_symbol symbol;
     param_type return_type;
     size_t num_of_param;
+    param_type*  param_type_array;
+    size_t  codegen_id;
 
 }attributes;
 
