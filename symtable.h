@@ -66,7 +66,7 @@ typedef struct
     bool main_flag;
     type_of_symbol symbol;
     param_type return_type;
-    int num_of_param;
+    size_t num_of_param;
 
 }attributes;
 
@@ -83,9 +83,9 @@ typedef struct hashtable
 {
     size_t capacity;
     item* item_array; 
-    int available_slots;
-    int used_slots;
-    int tombstoned_slots;
+    size_t available_slots;
+    size_t used_slots;
+    size_t tombstoned_slots;
     struct hashtable* parent;
 
 }hashtable;
