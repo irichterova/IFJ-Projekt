@@ -123,21 +123,29 @@ bool rehash_hashtable(hashtable* hstable)
         return false;
     }
 
-    for(size_t item_index = 0; item_index < hstable->capacity; item_index++)
+    for(size_t index = 0; index < hstable->capacity; index++)
     {
-        if(hstable->item_array[item_index].state == slot_taken)
+        if(hstable->item_array[index].state == slot_taken)
         {
-            size_t new_index = hash_function(rehashed_capacity, hstable->item_array[item_index].id);
-            rehashed_array[new_index] = hstable->item_array[item_index];
+            size_t hash_index = hash_function(rehashed_capacity, hstable->item_array[index].id);
+            for(size_t new_index = 0; new_index < rehashed_capacity; new_index++)
+            {
+                size_t item_count = (hash_index + new_index) % rehashed_capacity;
+
+                if(rehashed_array[item_count].state == slot_available)
+                {
+                    rehashed_array[item_count] = hstable->item_array[index];
+                    break;
+                }
+            }
         }
-        
-        else 
-        continue;
     }
 
     free(hstable->item_array);
     hstable->capacity = rehashed_capacity;
     hstable->item_array = rehashed_array;
+    hstable->tombstoned_slots = 0;
+    hstable->available_slots = hstable->capacity - hstable->used_slots;
 
     return true;
 }
