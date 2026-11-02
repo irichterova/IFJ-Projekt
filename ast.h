@@ -34,6 +34,16 @@ typedef enum {
     OP_NOTEQUAL
 } operator_type;
 
+typedef enum {
+    STMT_VAR,
+    STMT_VAL,
+    STMT_ASSIGN,
+    STMT_RETURN,
+    STMT_WHILE,
+    STMT_IF,
+    STMT_EXPR
+} statement_type;
+
 typedef struct unary_operator {
     operator_type op_type;
     struct expr_struct *operand;
