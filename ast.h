@@ -45,6 +45,12 @@ typedef struct binary_operator {
     struct expr_struct *right_operand;
 } binary_operator;
 
+typedef struct call_function {
+    char *name;
+    struct expr_struct **args;
+    int argc;
+} call_function;
+
 typedef union {
     int lit_int;
     double lit_double;
@@ -52,6 +58,7 @@ typedef union {
     char *variable;
     unary_operator unary_op;
     binary_operator binary_op;
+    call_function call_fn;
 } expr_data;
 
 typedef struct expr_struct {
