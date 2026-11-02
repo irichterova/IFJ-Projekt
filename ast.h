@@ -67,6 +67,11 @@ typedef struct def_var {
     struct expr_struct *init_expr;
 } def_var;
 
+typedef struct id_assign {
+    char *id_name;
+    struct expr_struct *assign_expr;
+} id_assign;
+
 typedef union {
     int lit_int;
     double lit_double;
