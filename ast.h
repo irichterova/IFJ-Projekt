@@ -34,11 +34,17 @@ typedef enum {
     OP_NOTEQUAL
 } operator_type;
 
+typedef struct unary_operator {
+    operator_type op_type;
+    struct expr_struct *operand;
+} unary_operator;
+
 typedef union {
     int lit_int;
     double lit_double;
     char *lit_string;
     char *variable;
+    unary_operator unary_op;
 } expr_data;
 
 typedef struct expr_struct {
