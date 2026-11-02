@@ -39,12 +39,19 @@ typedef struct unary_operator {
     struct expr_struct *operand;
 } unary_operator;
 
+typedef struct binary_operator {
+    operator_type op_type;
+    struct expr_struct *left_operand;
+    struct expr_struct *right_operand;
+} binary_operator;
+
 typedef union {
     int lit_int;
     double lit_double;
     char *lit_string;
     char *variable;
     unary_operator unary_op;
+    binary_operator binary_op;
 } expr_data;
 
 typedef struct expr_struct {
