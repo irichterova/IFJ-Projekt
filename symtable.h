@@ -12,8 +12,6 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26 code
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -77,7 +75,7 @@ typedef struct
     param_type return_type;
     size_t num_of_param;
     param_type*  param_type_array;
-    return_state* ret_state;
+    return_state ret_state;
     size_t  codegen_id;
 
 }attributes;
@@ -104,12 +102,8 @@ typedef struct hashtable
 
 size_t hash_function(size_t hstable_capacity, char* key);
 hashtable* create_hashtable(void);
-bool hashtable_init(hashtable* hstable);
-bool rehash_hashtable(hashtable* hstable);
 void delete_hashtable(hashtable* hstable);
-
 insert_status insert_hash(hashtable* hstable, char* key, attributes* attr);
 attributes* search_symbol(hashtable* hstable, char* key);
-bool tombstone_hash(item* item_to_tombs, hashtable* hstable);
 
 #endif

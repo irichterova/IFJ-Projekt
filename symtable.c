@@ -9,6 +9,11 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 
 #include "symtable.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+bool rehash_hashtable(hashtable* hstable);
+bool hashtable_init(hashtable* hstable);
 
 /*
     @brief  Create and initialize the structure of a hashtable, including the array
@@ -78,6 +83,7 @@ void delete_hashtable(hashtable* hstable)
         item *current = &hstable->item_array[item_index];
         if(current->state == slot_taken)
         {
+            free(current->attribute->param_type_array);
             free(current->attribute);
             free(current->id);
         }
