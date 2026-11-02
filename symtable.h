@@ -60,6 +60,13 @@ typedef enum
 
 }type_of_symbol;
 
+typedef enum
+{
+    ret_inferred,
+    ret_unknown,
+
+}return_state;
+
 typedef struct
 {
     param_type data_type;
@@ -70,6 +77,7 @@ typedef struct
     param_type return_type;
     size_t num_of_param;
     param_type*  param_type_array;
+    return_state* ret_state;
     size_t  codegen_id;
 
 }attributes;
