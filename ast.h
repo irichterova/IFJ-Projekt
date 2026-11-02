@@ -72,6 +72,32 @@ typedef struct id_assign {
     struct expr_struct *assign_expr;
 } id_assign;
 
+typedef struct while_loop {
+    struct expr_struct *while_expr;
+    struct statement_struct *while_body;
+} while_loop;
+
+typedef struct if_statement {
+    struct expr_struct *if_expr;
+    struct statement_struct *then_stmt;
+    struct statement_struct *else_stmt;
+} if_statement;
+
+typedef union {
+    def_var var_stmt;
+    id_assign id_stmt;
+    while_loop while_lp;
+    if_statement if_stmt;
+    struct expr_struct *ret_stmt;
+    struct expr_struct *expr_stmt;
+} statement_data;
+
+typedef struct statement_struct {
+    statement_type stmt_type;
+    struct statement_struct *next;
+    statement_data data;
+} statement_struct;
+
 typedef union {
     int lit_int;
     double lit_double;
