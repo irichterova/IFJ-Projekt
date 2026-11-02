@@ -61,6 +61,12 @@ typedef struct call_function {
     int argc;
 } call_function;
 
+typedef struct def_var {
+    char *id_name;
+    value_type declared_type;
+    struct expr_struct *init_expr;
+} def_var;
+
 typedef union {
     int lit_int;
     double lit_double;
