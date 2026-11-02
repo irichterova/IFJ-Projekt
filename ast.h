@@ -98,6 +98,25 @@ typedef struct statement_struct {
     statement_data data;
 } statement_struct;
 
+typedef struct params_struct {
+    char *param_name;
+    value_type param_type;
+} params_struct;
+
+typedef struct function_struct {
+    char *func_name;
+    struct params_struct *param_args;
+    int param_argc;
+    value_type ret_type;
+    int is_main;
+    struct statement_struct *stmt_body;
+    struct function_struct *next;
+} function_struct;
+
+typedef struct program_struct {
+    struct function_struct *first_func;
+} program_struct;
+
 typedef union {
     int lit_int;
     double lit_double;
