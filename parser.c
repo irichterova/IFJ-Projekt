@@ -7,6 +7,8 @@
 #include "parser.h"
 #include "error.h"
 #include "scanner.h"
+#include <stdlib.h>
+#include <string.h>
 
 static token_t token;
 
@@ -39,4 +41,26 @@ static void keyword_t_check(enum keywords_enum t_keyword) {
     } else {
         error_exit(ERR_SYN, 0, "Keyword of token doesn't match!");
     }
+}
+
+/**
+ * @brief checks syntax of prolog (import ifj26.*)
+ */
+static void parse_prolog(void) {
+    keyword_t_check(KEYWORD_IMPORT);
+    if (token.type == TOKEN_IDENTIFIER && strcmp(token.data.id, "ifj26") == 0) {
+        free(token.data.id);
+        next_token();
+    } else {
+        error_exit(ERR_SYN, 0, "Identifier doesn't match with string ifj26!");
+    }
+    type_t_check(TOKEN_PERIOD);
+    type_t_check(TOKEN_OP_MUL);
+    type_t_check(TOKEN_NL);
+}
+
+program_struct *parse_program(void) {
+    next_token();
+    parse_prolog();
+    return NULL;
 }
