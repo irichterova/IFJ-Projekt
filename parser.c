@@ -72,6 +72,19 @@ static value_type parse_type(void) {
 }
 
 /**
+ * @brief checks syntax of optional type after colon
+ * @return returns type of token from parse_type, returns unknown if there isn't colon
+ */
+static value_type parse_optional_type(void) {
+    if (token.type == TOKEN_COLON) {
+        next_token();
+        return parse_type();
+    } else {
+        return TYPE_UNKNOWN;
+    }
+}
+
+/**
  * @brief checks syntax of prolog (import ifj26.*)
  */
 static void parse_prolog(void) {
