@@ -44,6 +44,34 @@ static void keyword_t_check(enum keywords_enum t_keyword) {
 }
 
 /**
+ * @brief checks syntax of token type keyword (Int, Double, String, Unit)
+ * @return returns value_type that matches keyword
+ */
+static value_type parse_type(void) {
+    if (token.type == TOKEN_KEYWORD) {
+        switch (token.data.keyword) {
+        case KEYWORD_INT:
+            next_token();
+            return TYPE_INT;
+        case KEYWORD_DOUBLE:
+            next_token();
+            return TYPE_DOUBLE;
+        case KEYWORD_STRING:
+            next_token();
+            return TYPE_STRING;
+        case KEYWORD_UNIT:
+            next_token();
+            return TYPE_UNIT;
+        default:
+            error_exit(ERR_SYN, 0, "Token type doesn't match any type!");
+        }
+    } else {
+        error_exit(ERR_SYN, 0, "Expected keyword type!");
+    }
+    return TYPE_UNKNOWN;
+}
+
+/**
  * @brief checks syntax of prolog (import ifj26.*)
  */
 static void parse_prolog(void) {
