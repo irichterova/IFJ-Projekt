@@ -7,12 +7,18 @@
 #ifndef STACK_H
 #define STACK_H
 
-typedef struct stack t_stack;
+typedef struct element {
+    int data;
+    element_t* next;
+} element_t;
 
-void stack_init (t_stack* stack);
-void stack_push (t_stack* stack, int data);
-void stack_pop (t_stack* stack);
-int stack_top (t_stack* stack);
-bool stack_is_empty (t_stack* stack);
+typedef struct stack {
+    element_t* top;
+} stack_t;
+
+void stack_init (stack_t* stack);
+void stack_push (stack_t* stack, int data);
+void stack_pop (stack_t* stack);
+int stack_top (stack_t* stack);
 
 #endif

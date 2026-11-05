@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <limits.h>
 #include "scanner.h"
+#include "stack.h"
 
 enum states {
     S_START,
@@ -170,21 +171,25 @@ void check_eol_rule (bool new_line, enum eol_rules rule) {
 
 /**
  * @brief Handles indentation of the physical line
+ * @param stack Stack used to track levels of indentation
  * @param space_count Number of spaces at the beginning of the physical line
- * @param indent_level Level of current indentation
  * @param symbol Character most recently read from stdin
  * @param token Token whose type is to be set
  */
-void handle_indentation (int space_count, int* indent_level, int symbol, token_t* token) {
-    if (space_count > *indent_level) {
+void handle_indentation (stack_t* stack, int space_count, int symbol, token_t* token) {
+    if (space_count > stack_top(stack)) {
         ungetc(symbol, stdin);
-        (*indent_level)++;
+        stack_push(stack, space_count);
         token->type = TOKEN_INDENT;
     }
-    else if (space_count < *indent_level) {
+    else if (space_count < stack_top(stack)) {
         ungetc(symbol, stdin);
-        (*indent_level)--;
-        token->type = TOKEN_DEDENT;
+        stack_pop(stack);
+        if (space_count <= stack_top(stack)) token->type = TOKEN_DEDENT;
+        else {
+            fprintf(stderr, "Error: Wrong indentation\n");
+            exit(2);
+        }
     }
 }
 
@@ -203,14 +208,20 @@ token_t get_token(enum eol_rules rule) {
     bool new_line = false;
     bool empty_string = true;
     static bool line_begin = true;
-    static int indent_level = 0;
+    static stack_t indent_stack;
+    static bool indent_stack_init = false;
     static int space_count = 0;
     while (1) {
         symbol = getchar();
         switch (state) {
             case S_START:
-                if (symbol == ' ' && line_begin) {
-                    space_count++;
+                if (!indent_stack_init) {
+                    stack_init(&indent_stack);
+                    stack_push(&indent_stack, 0);
+                    indent_stack_init = true;
+                }
+                if (symbol == ' ') {
+                    if (line_begin) space_count++;
                     break;
                 }
                 else if (symbol == '\n') {
@@ -222,8 +233,8 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol == EOF) {
                     new_line = true;
                     check_eol_rule(new_line, rule);
-                    if (space_count < indent_level) {
-                        indent_level--;
+                    if (stack_top(&indent_stack) != 0) {
+                        stack_pop(&indent_stack);
                         token.type = TOKEN_DEDENT;
                         return token;
                     }
@@ -239,8 +250,8 @@ token_t get_token(enum eol_rules rule) {
 
                 check_eol_rule(new_line, rule);
 
-                if (space_count != indent_level) {
-                    handle_indentation(space_count, &indent_level, symbol, &token);
+                if (space_count != stack_top(&indent_stack)) {
+                    handle_indentation(&indent_stack, space_count, symbol, &token);
                     return token;
                 }
 
@@ -704,9 +715,10 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol != EOF) {
                     ungetc (symbol, stdin);
                 }
+                line_begin = false;
                 check_eol_rule(new_line, rule);
-                if (space_count != indent_level) {
-                    handle_indentation(space_count, &indent_level, symbol, &token);
+                if (space_count != stack_top(&indent_stack)) {
+                    handle_indentation(&indent_stack, space_count, '/', &token);
                     return token;
                 }
                 token.type = TOKEN_OP_DIV;
@@ -749,6 +761,7 @@ token_t get_token(enum eol_rules rule) {
                             break;
                         }
                         else {
+                            line_begin = false;
                             state = S_START;
                             break;
                         }

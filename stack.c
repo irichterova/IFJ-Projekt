@@ -6,22 +6,14 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include "stack.h"
 
-typedef struct element {
-    int data;
-    t_element* next;
-} t_element;
-
-typedef struct stack {
-    t_element* top;
-} t_stack;
-
-void stack_init (t_stack* stack) {
+void stack_init (stack_t* stack) {
     stack->top = NULL;
 }
 
-void stack_push (t_stack* stack, int data) {
-    t_element* new_elem = malloc(sizeof(t_element));
+void stack_push (stack_t* stack, int data) {
+    element_t* new_elem = malloc(sizeof(element_t));
     if (!new_elem) {
         fprintf(stderr, "Error: Allocation fault\n");
         exit(99);
@@ -31,22 +23,18 @@ void stack_push (t_stack* stack, int data) {
     stack->top = new_elem;
 }
 
-void stack_pop (t_stack* stack) {
+void stack_pop (stack_t* stack) {
     if (stack->top) {
-        t_element* elem2delete = stack->top;
+        element_t* elem2delete = stack->top;
         stack->top = elem2delete->next;
         free(elem2delete);
     }
 }
 
-int stack_top (t_stack* stack) {
+int stack_top (stack_t* stack) {
     if (!(stack->top)) {
         fprintf(stderr, "Error: Access to null pointer\n");
         exit(99);
     }
     return (stack->top->data);
-}
-
-bool stack_is_empty (t_stack* stack) {
-    return (stack->top == NULL);
 }
