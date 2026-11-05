@@ -169,6 +169,26 @@ void check_eol_rule (bool new_line, enum eol_rules rule) {
 }
 
 /**
+ * @brief Handles indentation of the physical line
+ * @param space_count Number of spaces at the beginning of the physical line
+ * @param indent_level Level of current indentation
+ * @param symbol Character most recently read from stdin
+ * @param token Token whose type is to be set
+ */
+void handle_indentation (int space_count, int* indent_level, int symbol, token_t* token) {
+    if (space_count > *indent_level) {
+        ungetc(symbol, stdin);
+        (*indent_level)++;
+        token->type = TOKEN_INDENT;
+    }
+    else if (space_count < *indent_level) {
+        ungetc(symbol, stdin);
+        (*indent_level)--;
+        token->type = TOKEN_DEDENT;
+    }
+}
+
+/**
  * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
  * @param rule EOL rule determining the permission for the presence of EOL
  * @return Data structure "token" 
@@ -183,7 +203,7 @@ token_t get_token(enum eol_rules rule) {
     bool new_line = false;
     bool empty_string = true;
     static bool line_begin = true;
-    static int indent_count = 0;
+    static int indent_level = 0;
     static int space_count = 0;
     while (1) {
         symbol = getchar();
@@ -191,14 +211,7 @@ token_t get_token(enum eol_rules rule) {
             case S_START:
                 if (symbol == ' ' && line_begin) {
                     space_count++;
-                    if (space_count > indent_count) {
-                        indent_count++;
-                        token.type = TOKEN_INDENT;
-                        return token;
-                    }
-                    else {
-                        break;
-                    }
+                    break;
                 }
                 else if (symbol == '\n') {
                     new_line = true;
@@ -209,8 +222,8 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol == EOF) {
                     new_line = true;
                     check_eol_rule(new_line, rule);
-                    if (space_count < indent_count) {
-                        indent_count--;
+                    if (space_count < indent_level) {
+                        indent_level--;
                         token.type = TOKEN_DEDENT;
                         return token;
                     }
@@ -226,10 +239,8 @@ token_t get_token(enum eol_rules rule) {
 
                 check_eol_rule(new_line, rule);
 
-                if (space_count < indent_count) {
-                    ungetc(symbol, stdin);
-                    indent_count--;
-                    token.type = TOKEN_DEDENT;
+                if (space_count != indent_level) {
+                    handle_indentation(space_count, &indent_level, symbol, &token);
                     return token;
                 }
 
@@ -694,6 +705,10 @@ token_t get_token(enum eol_rules rule) {
                     ungetc (symbol, stdin);
                 }
                 check_eol_rule(new_line, rule);
+                if (space_count != indent_level) {
+                    handle_indentation(space_count, &indent_level, symbol, &token);
+                    return token;
+                }
                 token.type = TOKEN_OP_DIV;
                 return token;
             case S_LINE_COM:
