@@ -7,7 +7,7 @@
 #ifndef AST_H
 #define AST_H
 
-typedef enum { TYPE_INT, TYPE_DOUBLE, TYPE_STRING, TYPE_UNIT, TYPE_UNKNOWN } value_type;
+typedef enum { TYPE_INT, TYPE_DOUBLE, TYPE_STRING, TYPE_UNIT, TYPE_BOOL, TYPE_UNKNOWN } value_type;
 
 typedef enum {
     EXPR_LIT_INT,
@@ -107,7 +107,8 @@ typedef struct function_struct {
     char *func_name;
     struct params_struct *param_args;
     int param_argc;
-    value_type ret_type;
+    value_type result_ret_type;
+    value_type declared_ret_type;
     int is_main;
     struct statement_struct *stmt_body;
     struct function_struct *next;
@@ -128,8 +129,8 @@ typedef union {
 } expr_data;
 
 typedef struct expr_struct {
-    expr_node_type n_type;
-    value_type v_type;
+    expr_node_type node_type;
+    value_type result_type;
     expr_data data;
 } expr_struct;
 
