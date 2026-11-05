@@ -182,17 +182,38 @@ token_t get_token(enum eol_rules rule) {
     int unended_com_cnt = 0;
     bool new_line = false;
     bool empty_string = true;
+    static bool line_begin = true;
+    static int indent_count = 0;
+    static int space_count = 0;
     while (1) {
         symbol = getchar();
         switch (state) {
             case S_START:
-                if (symbol == '\n') {
+                if (symbol == ' ' && line_begin) {
+                    space_count++;
+                    if (space_count > indent_count) {
+                        indent_count++;
+                        token.type = TOKEN_INDENT;
+                        return token;
+                    }
+                    else {
+                        break;
+                    }
+                }
+                else if (symbol == '\n') {
                     new_line = true;
+                    line_begin = true;
+                    space_count = 0;
                     break;
                 }
                 else if (symbol == EOF) {
                     new_line = true;
                     check_eol_rule(new_line, rule);
+                    if (space_count < indent_count) {
+                        indent_count--;
+                        token.type = TOKEN_DEDENT;
+                        return token;
+                    }
                     token.type = TOKEN_EOF;
                     return token;
                 }
@@ -201,7 +222,16 @@ token_t get_token(enum eol_rules rule) {
                     break;
                 }
 
+                line_begin = false;
+
                 check_eol_rule(new_line, rule);
+
+                if (space_count < indent_count) {
+                    ungetc(symbol, stdin);
+                    indent_count--;
+                    token.type = TOKEN_DEDENT;
+                    return token;
+                }
 
                 if (symbol == '@') {
                     token.type = TOKEN_AT;
@@ -669,6 +699,8 @@ token_t get_token(enum eol_rules rule) {
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
                     new_line = true;
+                    line_begin = true;
+                    space_count = 0;
                     state = S_START;
                     break;
                 }
@@ -688,6 +720,8 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '\n') {
                     new_line = true;
+                    line_begin = true;
+                    space_count = 0;
                     break;
                 }
                 else break;
@@ -712,6 +746,8 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '\n') {
                     new_line = true;
+                    line_begin = true;
+                    space_count = 0;
                 }
                 state = S_BLOCK_COM;
                 break;
@@ -728,6 +764,8 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '\n') {
                     new_line = true;
+                    line_begin = true;
+                    space_count = 0;
                 }
                 state = S_BLOCK_COM;
                 break;
