@@ -158,39 +158,80 @@ double convert_str2dbl (char* string) {
 }
 
 /**
- * @brief Checks if the EOL rule is being followed
- * @param new_line Value determining presence of EOL
- * @param rule EOL rule to be followed
+ * @brief Checks whether the EOL rule is being followed
+ * @param eol_before_token Indicates whether an EOL is present before the token
+ * @param rule EOL rule that must be followed
  */
-void check_eol_rule (bool new_line, enum eol_rules rule) {
-    if ((rule == EOL_REQUIRED && !new_line) || (rule == EOL_FORBIDDEN && new_line)) {
+void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
+    if ((rule == EOL_REQUIRED && !eol_before_token) || (rule == EOL_FORBIDDEN && eol_before_token)) {
         fprintf(stderr, "Error: EOL rule not followed\n");
         exit(2);
     }
 }
 
 /**
- * @brief Handles indentation of the physical line
- * @param stack Stack used to track levels of indentation
+ * @brief Updates the indentation stack
+ * @param indent_stack Indentation stack to be updated
  * @param space_count Number of spaces at the beginning of the physical line
  * @param symbol Character most recently read from stdin
- * @param token Token whose type is to be set
+ * @param token Token whose type may be set to TOKEN_INDENT or TOKEN_DEDENT
  */
-void handle_indentation (stack_t* stack, int space_count, int symbol, token_t* token) {
-    if (space_count > stack_top(stack)) {
+void update_indent_stack (stack_t* indent_stack, int space_count, int symbol, token_t* token) {
+    if (space_count > stack_top(indent_stack)) {
         ungetc(symbol, stdin);
-        stack_push(stack, space_count);
+        stack_push(indent_stack, space_count);
         token->type = TOKEN_INDENT;
     }
-    else if (space_count < stack_top(stack)) {
+    else if (space_count < stack_top(indent_stack)) {
         ungetc(symbol, stdin);
-        stack_pop(stack);
-        if (space_count <= stack_top(stack)) token->type = TOKEN_DEDENT;
+        stack_pop(indent_stack);
+        if (space_count <= stack_top(indent_stack)) token->type = TOKEN_DEDENT;
         else {
             fprintf(stderr, "Error: Wrong indentation\n");
             exit(2);
         }
     }
+}
+
+/**
+ * @brief Handles indentation and checks indentation rules
+ * @param tab_at_beginning Indicates whether a tab is at the beginning of a non-empty line
+ * @param logical_line_cont Indicates whether the current line is a logical line continuation
+ * @param symbol Character most recently read from stdin
+ * @param eol_before_token Indicates whether an EOL is present before the token
+ * @param space_count Number of spaces at the beginning of the physical line
+ * @param indent_stack Stack used to track levels of indentation
+ * @param file_start Indicates whether the beginning of the file is being processed
+ * @param pending_indentation Indicates whether indentation is waiting to be processed
+ * @param token Token whose type may be set to TOKEN_INDENT or TOKEN_DEDENT
+ * @return true if indentation was processed; false otherwise
+ */
+bool handle_indentation (bool tab_at_beginning, bool logical_line_cont, int symbol, bool eol_before_token, 
+    int space_count, stack_t* indent_stack, bool file_start, bool* pending_indentation, token_t* token) {
+    if (tab_at_beginning) {
+        fprintf(stderr, "Error: Tab can not be at the beginning of a non-empty line\n");
+        exit(1);
+    }
+
+    if (logical_line_cont && (symbol != ')') && eol_before_token && (space_count <= stack_top(indent_stack))) {
+        fprintf(stderr, "Error: Invalid indentation in logical line continuation\n");
+        exit(2);
+    }
+
+    if (!logical_line_cont) {
+        if ((file_start || eol_before_token) && space_count != stack_top(indent_stack)) {
+            *pending_indentation = true;
+        }
+
+        if (*pending_indentation) {
+            update_indent_stack(indent_stack, space_count, symbol, token);
+
+            if (space_count == stack_top(indent_stack)) *pending_indentation = false;
+
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -201,38 +242,55 @@ void handle_indentation (stack_t* stack, int space_count, int symbol, token_t* t
 token_t get_token(enum eol_rules rule) {
     int symbol;
     token_t token = {0};
-    enum states state;
-    state = S_START;
+    enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
-    int unended_com_cnt = 0;
-    bool new_line = false;
     bool empty_string = true;
-    static bool line_begin = true;
-    static stack_t indent_stack;
-    static bool indent_stack_init = false;
+    int unended_com_cnt = 0;
+    bool eol_before_token = false;
+    bool lf_in_comment = false;
+    static bool file_start = true;
     static int space_count = 0;
+    static stack_t indent_stack;
+    static bool stack_initialized = false;
+    static bool pending_indentation = false;
+    static int unended_parenth_cnt = 0;
+    bool logical_line_cont = false;
+    bool tab_at_beginning = false;
     while (1) {
         symbol = getchar();
         switch (state) {
             case S_START:
-                if (!indent_stack_init) {
-                    stack_init(&indent_stack);
+                if (!stack_initialized) {
+                    stack_init (&indent_stack);
+                    stack_initialized = true;
                     stack_push(&indent_stack, 0);
-                    indent_stack_init = true;
                 }
+
                 if (symbol == ' ') {
-                    if (line_begin) space_count++;
+                    if (file_start || eol_before_token) {
+                        space_count++;
+                    }
+                    break;
+                }
+                else if (symbol == '\r') break;
+                else if (symbol == '\t') {
+                    if (file_start || eol_before_token) {
+                        tab_at_beginning = true;
+                    }
                     break;
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
-                    line_begin = true;
+                    eol_before_token = true;
+                    tab_at_beginning = false;
                     space_count = 0;
+                    if (unended_parenth_cnt != 0) {
+                        logical_line_cont = true;
+                    }
                     break;
                 }
                 else if (symbol == EOF) {
-                    new_line = true;
-                    check_eol_rule(new_line, rule);
+                    eol_before_token = true;
+                    check_eol_rule(eol_before_token, rule);
                     if (stack_top(&indent_stack) != 0) {
                         stack_pop(&indent_stack);
                         token.type = TOKEN_DEDENT;
@@ -246,14 +304,12 @@ token_t get_token(enum eol_rules rule) {
                     break;
                 }
 
-                line_begin = false;
+                check_eol_rule(eol_before_token, rule);
 
-                check_eol_rule(new_line, rule);
+                if (handle_indentation (tab_at_beginning, logical_line_cont, symbol, eol_before_token, 
+                    space_count, &indent_stack, file_start, &pending_indentation, &token)) return token;      
 
-                if (space_count != stack_top(&indent_stack)) {
-                    handle_indentation(&indent_stack, space_count, symbol, &token);
-                    return token;
-                }
+                file_start = false;
 
                 if (symbol == '@') {
                     token.type = TOKEN_AT;
@@ -273,10 +329,12 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '.') state = S_PERIOD;
                 else if (symbol == '(') {
+                    unended_parenth_cnt++;
                     token.type = TOKEN_L_PARENTH;
                     return token;
                 }
                 else if (symbol == ')') {
+                    if (unended_parenth_cnt > 0) unended_parenth_cnt--;
                     token.type = TOKEN_R_PARENTH;
                     return token;
                 }
@@ -315,6 +373,10 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol == '"') {
                     state = S_STR;
                     buffer_init(&string_buffer);
+                }
+                else {
+                    fprintf(stderr, "Error: Invalid character\n");
+                    exit(1);
                 }
                 break;
             case S_GT:
@@ -715,19 +777,18 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol != EOF) {
                     ungetc (symbol, stdin);
                 }
-                line_begin = false;
-                check_eol_rule(new_line, rule);
-                if (space_count != stack_top(&indent_stack)) {
-                    handle_indentation(&indent_stack, space_count, '/', &token);
-                    return token;
-                }
+                check_eol_rule(eol_before_token, rule);
+                if (handle_indentation (tab_at_beginning, logical_line_cont, symbol, eol_before_token, 
+                    space_count, &indent_stack, file_start, &pending_indentation, &token)) return token;
+                file_start = false;
                 token.type = TOKEN_OP_DIV;
                 return token;
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
-                    new_line = true;
-                    line_begin = true;
+                    eol_before_token = true;
+                    tab_at_beginning = false;
                     space_count = 0;
+                    if (unended_parenth_cnt != 0) logical_line_cont = true;
                     state = S_START;
                     break;
                 }
@@ -746,9 +807,7 @@ token_t get_token(enum eol_rules rule) {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
-                    line_begin = true;
-                    space_count = 0;
+                    lf_in_comment = true;
                     break;
                 }
                 else break;
@@ -756,12 +815,12 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol == '/') {
                     unended_com_cnt--;
                     if (unended_com_cnt == 0) {
-                        if (new_line) {
+                        if (lf_in_comment) {
                             state = S_AFTER_BLOCK_COM;
                             break;
                         }
                         else {
-                            line_begin = false;
+                            file_start = false;
                             state = S_START;
                             break;
                         }
@@ -773,9 +832,7 @@ token_t get_token(enum eol_rules rule) {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
-                    line_begin = true;
-                    space_count = 0;
+                    lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
@@ -791,18 +848,20 @@ token_t get_token(enum eol_rules rule) {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
-                    line_begin = true;
-                    space_count = 0;
+                    lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
             case S_AFTER_BLOCK_COM:
                 if (symbol == '\n' || symbol == EOF) {
+                    eol_before_token = true;
+                    tab_at_beginning = false;
+                    space_count = 0;
+                    if (unended_parenth_cnt != 0) logical_line_cont = true;
                     state = S_START;
                     break;
                 }
-                else if (symbol == ' ' || symbol == '\t') break;
+                else if (symbol == ' ' || symbol == '\t' || symbol == '\r') break;
                 else {
                    fprintf(stderr, "Error: Multi-line block comment can not be followed by a token\n");
                    exit(1);

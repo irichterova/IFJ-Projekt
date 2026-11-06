@@ -1,11 +1,11 @@
 /**
  * Project name: Implementace překladače imperativního jazyka IFJ26
  * @author Izabela Richterová (xrichti00)
- * @file scanner.c
+ * @file stack.c
  */
 
 #include <stdio.h>
-#include <stdbool.h>
+#include <stdlib.h>
 #include "stack.h"
 
 void stack_init (stack_t* stack) {
