@@ -158,11 +158,11 @@ double convert_str2dbl (char* string) {
 
 /**
  * @brief Checks if the EOL rule is being followed
- * @param new_line Value determining presence of EOL
+ * @param eol_before_token Value determining presence of EOL
  * @param rule EOL rule to be followed
  */
-void check_eol_rule (bool new_line, enum eol_rules rule) {
-    if ((rule == EOL_REQUIRED && !new_line) || (rule == EOL_FORBIDDEN && new_line)) {
+void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
+    if ((rule == EOL_REQUIRED && !eol_before_token) || (rule == EOL_FORBIDDEN && eol_before_token)) {
         fprintf(stderr, "Error: EOL rule not followed\n");
         exit(2);
     }
@@ -179,20 +179,21 @@ token_t get_token(enum eol_rules rule) {
     enum states state;
     state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
-    int unended_com_cnt = 0;
-    bool new_line = false;
     bool empty_string = true;
+    int unended_com_cnt = 0;
+    bool eol_before_token = false;
+    bool lf_in_comment = false;
     while (1) {
         symbol = getchar();
         switch (state) {
             case S_START:
                 if (symbol == '\n') {
-                    new_line = true;
+                    eol_before_token = true;
                     break;
                 }
                 else if (symbol == EOF) {
-                    new_line = true;
-                    check_eol_rule(new_line, rule);
+                    eol_before_token = true;
+                    check_eol_rule(eol_before_token, rule);
                     token.type = TOKEN_EOF;
                     return token;
                 }
@@ -201,7 +202,7 @@ token_t get_token(enum eol_rules rule) {
                     break;
                 }
 
-                check_eol_rule(new_line, rule);
+                check_eol_rule(eol_before_token, rule);
 
                 if (symbol == '@') {
                     token.type = TOKEN_AT;
@@ -663,12 +664,12 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol != EOF) {
                     ungetc (symbol, stdin);
                 }
-                check_eol_rule(new_line, rule);
+                check_eol_rule(eol_before_token, rule);
                 token.type = TOKEN_OP_DIV;
                 return token;
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
-                    new_line = true;
+                    eol_before_token = true;
                     state = S_START;
                     break;
                 }
@@ -687,7 +688,7 @@ token_t get_token(enum eol_rules rule) {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
+                    lf_in_comment = true;
                     break;
                 }
                 else break;
@@ -695,7 +696,7 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol == '/') {
                     unended_com_cnt--;
                     if (unended_com_cnt == 0) {
-                        if (new_line) {
+                        if (lf_in_comment) {
                             state = S_AFTER_BLOCK_COM;
                             break;
                         }
@@ -711,7 +712,7 @@ token_t get_token(enum eol_rules rule) {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
+                    lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
@@ -727,16 +728,17 @@ token_t get_token(enum eol_rules rule) {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
+                    lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
             case S_AFTER_BLOCK_COM:
                 if (symbol == '\n' || symbol == EOF) {
+                    eol_before_token = true;
                     state = S_START;
                     break;
                 }
-                else if (symbol == ' ' || symbol == '\t') break;
+                else if (symbol == ' ' || symbol == '\t' || symbol == '\r') break;
                 else {
                    fprintf(stderr, "Error: Multi-line block comment can not be followed by a token\n");
                    exit(1);
