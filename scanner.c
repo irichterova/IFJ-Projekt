@@ -19,6 +19,8 @@ enum states {
     S_LT,
     S_ASSIGN,
     S_NOT,
+    S_AND,
+    S_OR,
     S_DIV,
     S_IDENTIF,
     S_ID_UNDERSCORE,
@@ -61,7 +63,8 @@ char* keywords_arr[] = {
     "Unit",
     "val",
     "var",
-    "while"
+    "while",
+    "Boolean",
 };
 
 typedef struct buffer {
@@ -354,6 +357,8 @@ token_t get_token(enum eol_rules rule) {
                     token.type = TOKEN_OP_MUL;
                     return token;
                 }
+                else if (symbol == '&') state = S_AND;
+                else if (symbol == '|') state = S_OR;
                 else if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z')) {
                     state = S_IDENTIF;
                     buffer_init(&identif_buffer);
@@ -414,8 +419,27 @@ token_t get_token(enum eol_rules rule) {
                     token.type = TOKEN_OP_NEQ;
                     return token;
                 }
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                token.type = TOKEN_OP_NOT;
+                return token;
+            case S_AND:
+                if (symbol == '&') {
+                    token.type = TOKEN_OP_AND;
+                    return token;
+                }
                 else {
-                    fprintf(stderr, "Error: Expected '=' after '!'\n");
+                    fprintf(stderr, "Error: '&' alone is an invalid character\n");
+                    exit(1);
+                }
+            case S_OR:
+                if (symbol == '|') {
+                    token.type = TOKEN_OP_OR;
+                    return token;
+                }
+                else {
+                    fprintf(stderr, "Error: '|' alone is an invalid character\n");
                     exit(1);
                 }
             case S_IDENTIF:
@@ -435,8 +459,18 @@ token_t get_token(enum eol_rules rule) {
                     buffer_destruct(&identif_buffer);
                 }
                 else {
-                    token.type = TOKEN_IDENTIFIER;
-                    token.data.id = identif_buffer.data;
+                    if (strcmp("true", identif_buffer.data) == 0) {
+                        buffer_destruct(&identif_buffer);
+                        token.type = TOKEN_TRUE_LITERAL;
+                    }
+                    else if (strcmp("false", identif_buffer.data) == 0) {
+                        buffer_destruct(&identif_buffer);
+                        token.type = TOKEN_FALSE_LITERAL;
+                    }
+                    else {
+                        token.type = TOKEN_IDENTIFIER;
+                        token.data.id = identif_buffer.data;
+                    }
                 }
                 return token;
             case S_ID_UNDERSCORE:

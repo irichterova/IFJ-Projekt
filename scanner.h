@@ -13,6 +13,8 @@ enum token_types {
     TOKEN_INT_LITERAL,
     TOKEN_DBL_LITERAL,
     TOKEN_STR_LITERAL,
+    TOKEN_TRUE_LITERAL,
+    TOKEN_FALSE_LITERAL,
     TOKEN_L_PARENTH,
     TOKEN_R_PARENTH,
     TOKEN_OP_ADD,
@@ -25,6 +27,9 @@ enum token_types {
     TOKEN_OP_GE,
     TOKEN_OP_EQ,
     TOKEN_OP_NEQ,
+    TOKEN_OP_NOT,
+    TOKEN_OP_AND,
+    TOKEN_OP_OR,
     TOKEN_ASSIGN,
     TOKEN_COLON,
     TOKEN_SEMICOLON,
@@ -51,6 +56,7 @@ enum keywords_enum {
     KEYWORD_VAL,
     KEYWORD_VAR,
     KEYWORD_WHILE,
+    KEYWORD_BOOLEAN,
 };
 
 enum eol_rules {
