@@ -157,9 +157,9 @@ double convert_str2dbl (char* string) {
 }
 
 /**
- * @brief Checks if the EOL rule is being followed
- * @param eol_before_token Value determining presence of EOL
- * @param rule EOL rule to be followed
+ * @brief Checks whether the EOL rule is being followed
+ * @param eol_before_token Indicates whether an EOL is present before the token
+ * @param rule EOL rule that must be followed
  */
 void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
     if ((rule == EOL_REQUIRED && !eol_before_token) || (rule == EOL_FORBIDDEN && eol_before_token)) {
