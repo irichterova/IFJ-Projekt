@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <limits.h>
 #include "scanner.h"
+#include "stack.h"
 
 enum states {
     S_START,
@@ -169,6 +170,30 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
 }
 
 /**
+ * @brief Handles indentation of the physical line
+ * @param stack Stack used to track levels of indentation
+ * @param space_count Number of spaces at the beginning of the physical line
+ * @param symbol Character most recently read from stdin
+ * @param token Token whose type is to be set
+ */
+void handle_indentation (stack_t* stack, int space_count, int symbol, token_t* token) {
+    if (space_count > stack_top(stack)) {
+        ungetc(symbol, stdin);
+        stack_push(stack, space_count);
+        token->type = TOKEN_INDENT;
+    }
+    else if (space_count < stack_top(stack)) {
+        ungetc(symbol, stdin);
+        stack_pop(stack);
+        if (space_count <= stack_top(stack)) token->type = TOKEN_DEDENT;
+        else {
+            fprintf(stderr, "Error: Wrong indentation\n");
+            exit(2);
+        }
+    }
+}
+
+/**
  * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
  * @param rule EOL rule determining the permission for the presence of EOL
  * @return Data structure "token" 
@@ -183,12 +208,31 @@ token_t get_token(enum eol_rules rule) {
     int unended_com_cnt = 0;
     bool eol_before_token = false;
     bool lf_in_comment = false;
+    static bool file_start = true;
+    static int space_count = 0;
+    static stack_t stack;
+    static bool stack_initialized = false;
+    static bool pending_indentation = false;
     while (1) {
         symbol = getchar();
         switch (state) {
             case S_START:
-                if (symbol == '\n') {
+                if (!stack_initialized) {
+                    stack_init (&stack);
+                    stack_initialized = true;
+                    stack_push(&stack, 0);
+                }
+
+                if (symbol == ' ') {
+                    if (file_start || eol_before_token) {
+                        space_count++;
+                    }
+                    break;
+                }
+                else if (symbol == '\r') break;
+                else if (symbol == '\n') {
                     eol_before_token = true;
+                    space_count = 0;
                     break;
                 }
                 else if (symbol == EOF) {
@@ -203,6 +247,20 @@ token_t get_token(enum eol_rules rule) {
                 }
 
                 check_eol_rule(eol_before_token, rule);
+
+                if ((file_start || eol_before_token) && space_count != stack_top(&stack)) {
+                    pending_indentation = true;
+                }
+
+                if (pending_indentation) {
+                    handle_indentation(&stack, space_count, symbol, &token);
+
+                    if (space_count == stack_top(&stack)) pending_indentation = false;
+
+                    return token;
+                }
+
+                file_start = false;
 
                 if (symbol == '@') {
                     token.type = TOKEN_AT;
@@ -665,11 +723,24 @@ token_t get_token(enum eol_rules rule) {
                     ungetc (symbol, stdin);
                 }
                 check_eol_rule(eol_before_token, rule);
+                if ((file_start || eol_before_token) && space_count != stack_top(&stack)) {
+                    pending_indentation = true;
+                }
+
+                if (pending_indentation) {
+                    handle_indentation(&stack, space_count, '/', &token);
+
+                    if (space_count == stack_top(&stack)) pending_indentation = false;
+
+                    return token;
+                }
+                file_start = false;
                 token.type = TOKEN_OP_DIV;
                 return token;
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
                     eol_before_token = true;
+                    space_count = 0;
                     state = S_START;
                     break;
                 }
@@ -735,6 +806,7 @@ token_t get_token(enum eol_rules rule) {
             case S_AFTER_BLOCK_COM:
                 if (symbol == '\n' || symbol == EOF) {
                     eol_before_token = true;
+                    space_count = 0;
                     state = S_START;
                     break;
                 }

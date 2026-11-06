@@ -32,6 +32,8 @@ enum token_types {
     TOKEN_PERIOD,
     TOKEN_AT,
     TOKEN_EOF,
+    TOKEN_INDENT,
+    TOKEN_DEDENT,
 };
 
 enum keywords_enum {
