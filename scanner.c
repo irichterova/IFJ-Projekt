@@ -12,6 +12,7 @@
 #include <limits.h>
 #include "scanner.h"
 #include "stack.h"
+#include "buffer.h"
 
 enum states {
     S_START,
@@ -66,56 +67,6 @@ char* keywords_arr[] = {
     "while",
     "Boolean",
 };
-
-typedef struct buffer {
-    char* data;
-    int size;
-    int capacity;
-} buffer_t;
-
-/**
- * @brief Initializes the data structure "buffer"
- * @param buffer Pointer to the buffer to be initialized
- */
-void buffer_init (buffer_t* buffer) {
-    buffer->capacity = 10;
-    buffer->size = 0;
-    buffer->data = malloc (buffer->capacity * sizeof (char));
-    if (!(buffer->data)) exit (99);
-}
-
-/**
- * @brief Doubles the capacity of the buffer 
- * @param buffer Pointer to the buffer whose capacity is to be increased
- */
-void buffer_capacity_increase (buffer_t* buffer) {
-    char* new_data = realloc (buffer->data, buffer->capacity * 2 * sizeof(char));
-    if (!new_data) exit (99);
-    buffer->data = new_data;
-    buffer->capacity = buffer->capacity * 2;
-}
-
-/**
- * @brief Adds the symbol to the buffer
- * @param buffer Pointer to the buffer the symbol is to be added to
- * @param symbol The character to be added to the buffer
- */
-void add_symbol2buffer (buffer_t* buffer, char symbol) {
-    if (buffer->size == buffer->capacity) buffer_capacity_increase(buffer);
-    buffer->data[buffer->size] = symbol;
-    buffer->size++;
-}
-
-/**
- * @brief Destroys the data structure "buffer" 
- * @param buffer Pointer to the buffer to be destroyed
- */
-void buffer_destruct (buffer_t *buffer) {
-    buffer->capacity = 0;
-    buffer->size = 0;
-    free(buffer->data); 
-    buffer->data = NULL;
-}
 
 /**
  * @brief Checks if the identifier is a keyword
