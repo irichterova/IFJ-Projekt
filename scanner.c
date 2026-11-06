@@ -170,11 +170,11 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
 }
 
 /**
- * @brief Handles indentation of the physical line
- * @param indent_stack Stack used to track levels of indentation
+ * @brief Updates the indentation stack
+ * @param indent_stack Indentation stack to be updated
  * @param space_count Number of spaces at the beginning of the physical line
  * @param symbol Character most recently read from stdin
- * @param token Token whose type is to be set
+ * @param token Token whose type may be set to TOKEN_INDENT or TOKEN_DEDENT
  */
 void update_indent_stack (stack_t* indent_stack, int space_count, int symbol, token_t* token) {
     if (space_count > stack_top(indent_stack)) {
@@ -193,11 +193,24 @@ void update_indent_stack (stack_t* indent_stack, int space_count, int symbol, to
     }
 }
 
+/**
+ * @brief Handles indentation and checks indentation rules
+ * @param tab_at_beginning Indicates whether a tab is at the beginning of a non-empty line
+ * @param logical_line_cont Indicates whether the current line is a logical line continuation
+ * @param symbol Character most recently read from stdin
+ * @param eol_before_token Indicates whether an EOL is present before the token
+ * @param space_count Number of spaces at the beginning of the physical line
+ * @param indent_stack Stack used to track levels of indentation
+ * @param file_start Indicates whether the beginning of the file is being processed
+ * @param pending_indentation Indicates whether indentation is waiting to be processed
+ * @param token Token whose type may be set to TOKEN_INDENT or TOKEN_DEDENT
+ * @return true if indentation was processed; false otherwise
+ */
 bool handle_indentation (bool tab_at_beginning, bool logical_line_cont, int symbol, bool eol_before_token, 
     int space_count, stack_t* indent_stack, bool file_start, bool* pending_indentation, token_t* token) {
     if (tab_at_beginning) {
         fprintf(stderr, "Error: Tab can not be at the beginning of a non-empty line\n");
-        exit(2);
+        exit(1);
     }
 
     if (logical_line_cont && (symbol != ')') && eol_before_token && (space_count <= stack_top(indent_stack))) {
@@ -268,6 +281,7 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '\n') {
                     eol_before_token = true;
+                    tab_at_beginning = false;
                     space_count = 0;
                     if (unended_parenth_cnt != 0) {
                         logical_line_cont = true;
@@ -772,6 +786,7 @@ token_t get_token(enum eol_rules rule) {
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
                     eol_before_token = true;
+                    tab_at_beginning = false;
                     space_count = 0;
                     if (unended_parenth_cnt != 0) logical_line_cont = true;
                     state = S_START;
@@ -805,6 +820,7 @@ token_t get_token(enum eol_rules rule) {
                             break;
                         }
                         else {
+                            file_start = false;
                             state = S_START;
                             break;
                         }
@@ -839,6 +855,7 @@ token_t get_token(enum eol_rules rule) {
             case S_AFTER_BLOCK_COM:
                 if (symbol == '\n' || symbol == EOF) {
                     eol_before_token = true;
+                    tab_at_beginning = false;
                     space_count = 0;
                     if (unended_parenth_cnt != 0) logical_line_cont = true;
                     state = S_START;
