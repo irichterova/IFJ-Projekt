@@ -201,8 +201,7 @@ void handle_indentation (stack_t* stack, int space_count, int symbol, token_t* t
 token_t get_token(enum eol_rules rule) {
     int symbol;
     token_t token = {0};
-    enum states state;
-    state = S_START;
+    enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
     bool empty_string = true;
     int unended_com_cnt = 0;
@@ -213,6 +212,8 @@ token_t get_token(enum eol_rules rule) {
     static stack_t stack;
     static bool stack_initialized = false;
     static bool pending_indentation = false;
+    static int unended_parenth_cnt = 0;
+    bool cont_logical_line = false;
     while (1) {
         symbol = getchar();
         switch (state) {
@@ -233,11 +234,19 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol == '\n') {
                     eol_before_token = true;
                     space_count = 0;
+                    if (unended_parenth_cnt != 0) {
+                        cont_logical_line = true;
+                    }
                     break;
                 }
                 else if (symbol == EOF) {
                     eol_before_token = true;
                     check_eol_rule(eol_before_token, rule);
+                    if (stack_top(&stack) != 0) {
+                        stack_pop(&stack);
+                        token.type = TOKEN_DEDENT;
+                        return token;
+                    }
                     token.type = TOKEN_EOF;
                     return token;
                 }
@@ -248,17 +257,24 @@ token_t get_token(enum eol_rules rule) {
 
                 check_eol_rule(eol_before_token, rule);
 
-                if ((file_start || eol_before_token) && space_count != stack_top(&stack)) {
-                    pending_indentation = true;
+                if (cont_logical_line && (symbol != ')') && eol_before_token && (space_count <= stack_top(&stack))) {
+                    fprintf(stderr, "Error: Invalid indentation of continual logical line\n");
+                    exit(2);
                 }
 
-                if (pending_indentation) {
-                    handle_indentation(&stack, space_count, symbol, &token);
+                if (!cont_logical_line) {
+                    if ((file_start || eol_before_token) && space_count != stack_top(&stack)) {
+                        pending_indentation = true;
+                    }
 
-                    if (space_count == stack_top(&stack)) pending_indentation = false;
+                    if (pending_indentation) {
+                        handle_indentation(&stack, space_count, symbol, &token);
 
-                    return token;
-                }
+                        if (space_count == stack_top(&stack)) pending_indentation = false;
+
+                        return token;
+                    }
+                }                
 
                 file_start = false;
 
@@ -280,10 +296,12 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '.') state = S_PERIOD;
                 else if (symbol == '(') {
+                    unended_parenth_cnt++;
                     token.type = TOKEN_L_PARENTH;
                     return token;
                 }
                 else if (symbol == ')') {
+                    if (unended_parenth_cnt > 0) unended_parenth_cnt--;
                     token.type = TOKEN_R_PARENTH;
                     return token;
                 }
@@ -741,6 +759,7 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol == '\n' || symbol == EOF) {
                     eol_before_token = true;
                     space_count = 0;
+                    if (unended_parenth_cnt != 0) cont_logical_line = true;
                     state = S_START;
                     break;
                 }
@@ -807,6 +826,7 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol == '\n' || symbol == EOF) {
                     eol_before_token = true;
                     space_count = 0;
+                    if (unended_parenth_cnt != 0) cont_logical_line = true;
                     state = S_START;
                     break;
                 }
