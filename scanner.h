@@ -1,3 +1,9 @@
+/**
+ * Project name: Implementace překladače imperativního jazyka IFJ26
+ * @author Izabela Richterová (xrichti00)
+ * @file scanner.h
+ */
+
 #ifndef SCANNER_H
 #define SCANNER_H
 
@@ -26,6 +32,7 @@ enum token_types {
     TOKEN_PERIOD,
     TOKEN_AT,
     TOKEN_EOF,
+    TOKEN_NL,
 };
 
 enum keywords_enum {
@@ -49,8 +56,8 @@ union token_data {
     int int_value;
     double dbl_value;
     char* str_value;
+    char* id;
     enum keywords_enum keyword;
-    // + symtable pointer
 };
 
 typedef struct token {
