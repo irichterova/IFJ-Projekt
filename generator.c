@@ -4,20 +4,19 @@
 
 int main(void)
 {
-    expr_struct expr = {0};
-    expr.node_type = EXPR_LIT_UNIT;
 
     expr_struct expr2 = {0};
     expr2.node_type = EXPR_LIT_DOUBLE;
     expr2.data.lit_double = 2.534;
 
-    expr_struct expr3 = {0};
-    expr3.node_type = EXPR_LIT_STRING;
-    expr3.data.lit_string = "ahoj jak se mas#\\";
+    statement_struct st = {0};
+    st.stmt_type = STMT_VAL;
+    st.data.var_stmt.id_name = "x";
+    st.data.var_stmt.codegen_id = 1;
+    st.data.var_stmt.init_expr = &expr2;
 
-    gen_expression(&expr);
     gen_expression(&expr2);
-    gen_expression(&expr3);
+    gen_statement(&st);
 
     return 0;
 }
@@ -45,7 +44,6 @@ void emit_expr_str(char *str)
             emit_expr("%c", c);
         }
     }
-
 }
 
 
@@ -70,5 +68,20 @@ void gen_expression(expr_struct* expression)
             break;
         default:
         break;
+    }
+}
+
+void gen_statement(statement_struct* statement)
+{
+    switch(statement->stmt_type)
+    {
+        case STMT_VAL:
+        case STMT_VAR:
+            emit_expr("DEFVAR LF@%s$%zu\n", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+            gen_expression(statement->data.var_stmt.init_expr);
+            emit_expr("POPS LF@%s$%zu\n", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+            break;   
+        default:
+        break;   
     }
 }
