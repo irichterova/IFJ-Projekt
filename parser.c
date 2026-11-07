@@ -122,6 +122,24 @@ static void parse_params(void) {
 }
 
 /**
+ * @brief checks syntax of optional main
+ * @return if there is main (1) or not (0)
+ */
+static int parse_optional_main(void) {
+    if (token.type == TOKEN_AT) {
+        next_token();
+        if (token.type == TOKEN_IDENTIFIER && strcmp(token.data.id, "main") == 0) {
+            free(token.data.id);
+            next_token();
+            return 1;
+        } else {
+            error_exit(ERR_SYN, 0, "Identifier doesn't match with string main!");
+        }
+    }
+    return 0;
+}
+
+/**
  * @brief checks syntax of prolog (import ifj26.*)
  */
 static void parse_prolog(void) {
