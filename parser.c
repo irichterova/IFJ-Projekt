@@ -11,6 +11,7 @@
 #include <string.h>
 
 static token_t token;
+static void parse_params_next(void);
 
 /**
  * @brief selects next token from scanner
@@ -82,6 +83,70 @@ static value_type parse_optional_type(void) {
     } else {
         return TYPE_UNKNOWN;
     }
+}
+
+/**
+ * @brief checks syntax of next parameter after comma
+ */
+static void parse_params_rest(void) {
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+        next_token();
+        type_t_check(TOKEN_COLON);
+        parse_type();
+        parse_params_next();
+    }
+}
+
+/**
+ * @brief checks whether there is comma after parameter in function
+ */
+static void parse_params_next(void) {
+    if (token.type == TOKEN_COMMA) {
+        next_token();
+        parse_params_rest();
+    }
+}
+
+/**
+ * @brief checks syntax of parameters in function
+ */
+static void parse_params(void) {
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+        next_token();
+        type_t_check(TOKEN_COLON);
+        parse_type();
+        parse_params_next();
+    }
+}
+
+/**
+ * @brief checks syntax of optional eol after main
+ */
+static void parse_optional_eol(void) {
+    if (token.type == TOKEN_NL) {
+        next_token();
+    }
+}
+
+/**
+ * @brief checks syntax of optional main
+ * @return if there is main (1) or not (0)
+ */
+static int parse_optional_main(void) {
+    if (token.type == TOKEN_AT) {
+        next_token();
+        if (token.type == TOKEN_IDENTIFIER && strcmp(token.data.id, "main") == 0) {
+            free(token.data.id);
+            next_token();
+            parse_optional_eol();
+            return 1;
+        } else {
+            error_exit(ERR_SYN, 0, "Identifier doesn't match with string main!");
+        }
+    }
+    return 0;
 }
 
 /**
