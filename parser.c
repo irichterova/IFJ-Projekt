@@ -85,6 +85,28 @@ static value_type parse_optional_type(void) {
 }
 
 /**
+ * @brief checks syntax of next parameters after comma
+ */
+static void parse_params_next(void) {
+    if (token.type == TOKEN_COMMA) {
+        next_token();
+    }
+}
+
+/**
+ * @brief checks syntax of parameters in function
+ */
+static void parse_params(void) {
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+        next_token();
+        type_t_check(TOKEN_COLON);
+        parse_type();
+        parse_params_next();
+    }
+}
+
+/**
  * @brief checks syntax of prolog (import ifj26.*)
  */
 static void parse_prolog(void) {
