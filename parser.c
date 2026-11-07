@@ -11,6 +11,7 @@
 #include <string.h>
 
 static token_t token;
+static void parse_params_next(void);
 
 /**
  * @brief selects next token from scanner
@@ -85,11 +86,25 @@ static value_type parse_optional_type(void) {
 }
 
 /**
- * @brief checks syntax of next parameters after comma
+ * @brief checks syntax of next parameter after comma
+ */
+static void parse_params_rest(void) {
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+        next_token();
+        type_t_check(TOKEN_COLON);
+        parse_type();
+        parse_params_next();
+    }
+}
+
+/**
+ * @brief checks whether there is comma after parameter in function
  */
 static void parse_params_next(void) {
     if (token.type == TOKEN_COMMA) {
         next_token();
+        parse_params_rest();
     }
 }
 
