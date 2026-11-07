@@ -122,6 +122,15 @@ static void parse_params(void) {
 }
 
 /**
+ * @brief checks syntax of optional eol after main
+ */
+static void parse_optional_eol(void) {
+    if (token.type == TOKEN_NL) {
+        next_token();
+    }
+}
+
+/**
  * @brief checks syntax of optional main
  * @return if there is main (1) or not (0)
  */
@@ -131,6 +140,7 @@ static int parse_optional_main(void) {
         if (token.type == TOKEN_IDENTIFIER && strcmp(token.data.id, "main") == 0) {
             free(token.data.id);
             next_token();
+            parse_optional_eol();
             return 1;
         } else {
             error_exit(ERR_SYN, 0, "Identifier doesn't match with string main!");
