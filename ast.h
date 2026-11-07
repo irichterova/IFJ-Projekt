@@ -6,6 +6,7 @@
 
 #ifndef AST_H
 #define AST_H
+#include <stddef.h>
 
 typedef enum { TYPE_INT, TYPE_DOUBLE, TYPE_STRING, TYPE_UNIT, TYPE_BOOL, TYPE_UNKNOWN } value_type;
 
@@ -63,12 +64,14 @@ typedef struct call_function {
 
 typedef struct def_var {
     char *id_name;
+    size_t codegen_id;
     value_type declared_type;
     struct expr_struct *init_expr;
 } def_var;
 
 typedef struct id_assign {
     char *id_name;
+    size_t codegen_id;
     struct expr_struct *assign_expr;
 } id_assign;
 
@@ -100,6 +103,7 @@ typedef struct statement_struct {
 
 typedef struct params_struct {
     char *param_name;
+    size_t codegen_id;
     value_type param_type;
 } params_struct;
 
@@ -118,11 +122,16 @@ typedef struct program_struct {
     struct function_struct *first_func;
 } program_struct;
 
+typedef struct var_struct {
+    char *id_name;
+    size_t codegen_id;
+} var_struct;
+
 typedef union {
     int lit_int;
     double lit_double;
     char *lit_string;
-    char *variable;
+    var_struct variable;
     unary_operator unary_op;
     binary_operator binary_op;
     call_function call_fn;
