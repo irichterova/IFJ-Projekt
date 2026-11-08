@@ -113,6 +113,14 @@ void gen_expression(expr_struct* expression)
                 default:
                 break;
             }
+        case EXPR_CALL_FUNC:
+            for(size_t i = 0; i < expression->data.call_fn.argc; i++)
+            {
+            gen_expression(expression->data.call_fn.args[i]);
+            }
+            newline_emit_expr("CREATEFRAME");
+            newline_emit_expr("CALL fn_%s", expression->data.call_fn.name);
+            break;
         default:
         break;
     }
