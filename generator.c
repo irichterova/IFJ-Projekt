@@ -2,35 +2,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-int main(void)
-{
-
-    expr_struct expr2 = {0};
-    expr2.node_type = EXPR_LIT_DOUBLE;
-    expr2.data.lit_double = 2.534;
-
-    expr_struct expr = {0};
-    expr.node_type = EXPR_LIT_INT;
-    expr.data.lit_int = 3;
-
-    statement_struct st = {0};
-    st.stmt_type = STMT_VAL;
-    st.data.var_stmt.id_name = "x";
-    st.data.var_stmt.codegen_id = 1;
-    st.data.var_stmt.init_expr = &expr2;
-
-    statement_struct st2 = {0};
-    st2.stmt_type = STMT_ASSIGN;
-    st2.data.id_stmt.assign_expr = &expr;
-    st2.data.id_stmt.id_name = st.data.var_stmt.id_name;
-
-    gen_expression(&expr2);
-    gen_statement(&st);
-    gen_statement(&st2);
-
-    return 0;
-}
-
 
 void emit_expr(char *msg_format,...)
 {
@@ -38,6 +9,15 @@ void emit_expr(char *msg_format,...)
     va_start(argument, msg_format);
     vprintf(msg_format, argument);
     va_end(argument);
+}
+
+void newline_emit_expr(char *msg_format,...)
+{
+    va_list argument;
+    va_start(argument, msg_format);
+    vprintf(msg_format, argument);
+    va_end(argument);
+    putchar('\n');
 }
 
 void emit_expr_str(char *str)
@@ -63,18 +43,29 @@ void gen_expression(expr_struct* expression)
     switch(expression->node_type)
     {
         case EXPR_LIT_INT:
-            emit_expr("%s int@%i\n", msg, expression->data.lit_int);
+            newline_emit_expr("%s int@%i", msg, expression->data.lit_int);
             break;
         case EXPR_LIT_DOUBLE:
-            emit_expr("%s float@%f\n", msg, expression->data.lit_double);
+            newline_emit_expr("%s float@%a", msg, expression->data.lit_double);
             break;
         case EXPR_LIT_UNIT:
-            emit_expr("%s nil@nil\n", msg);
+            newline_emit_expr("%s nil@nil", msg);
             break;
         case EXPR_LIT_STRING:
             emit_expr("%s string@", msg);
             emit_expr_str(expression->data.lit_string);
             emit_expr("\n");
+            break;
+        case EXPR_VARIABLE:
+            newline_emit_expr("%s LF@%c$%zu", msg, expression->data.variable.id_name, expression->data.variable.codegen_id);
+            break;
+        case EXPR_UNA_OP:
+            if(expression->result_type == TYPE_INT)
+            newline_emit_expr("%s int@0", msg);
+            else
+            newline_emit_expr("%s float@0x0p+0", msg);
+            gen_expression(expression->data.unary_op.operand);
+            newline_emit_expr("SUBS");
             break;
         default:
         break;
@@ -87,13 +78,13 @@ void gen_statement(statement_struct* statement)
     {
         case STMT_VAL:
         case STMT_VAR:
-            emit_expr("DEFVAR LF@%s$%zu\n", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+            newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             gen_expression(statement->data.var_stmt.init_expr);
-            emit_expr("POPS LF@%s$%zu\n", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+            newline_emit_expr("POPS LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             break;   
         case STMT_ASSIGN:
             gen_expression(statement->data.id_stmt.assign_expr);
-            emit_expr("POPS LF@%s$%zu\n", statement->data.id_stmt.id_name);
+            newline_emit_expr("POPS LF@%s$%zu", statement->data.id_stmt.id_name, statement->data.id_stmt.codegen_id);
             break;
         default:
         break;   
