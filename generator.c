@@ -79,11 +79,39 @@ void gen_expression(expr_struct* expression)
                     newline_emit_expr("SUBS");
                     break;
                 case OP_MULTIPLICATION:
-                    newline_emit_expr("MUL");
+                    newline_emit_expr("MULS");
                     break;
                 case OP_DIVISION:
-                    newline_emit_expr("DIV");
+                    if(expression->result_type == TYPE_INT)
+                    {
+                    newline_emit_expr("IDIVS");
+                    }
+                    else 
+                    newline_emit_expr("DIVS");
                     break;
+                case OP_LESS:
+                    newline_emit_expr("LTS");
+                    break;
+                case OP_GREATER:
+                    newline_emit_expr("GTS");
+                    break;
+                case OP_EQUAL_LESS:
+                    newline_emit_expr("GTS");
+                    newline_emit_expr("NOTS");
+                    break;
+                case OP_EQUAL_GREATER:
+                    newline_emit_expr("LTS");
+                    newline_emit_expr("NOTS");
+                    break;
+                case OP_EQUAL:
+                    newline_emit_expr("EQS");
+                    break;
+                case OP_NOTEQUAL:
+                    newline_emit_expr("EQS");
+                    newline_emit_expr("NOTS");
+                    break;
+                default:
+                break;
             }
         default:
         break;
