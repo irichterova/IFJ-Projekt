@@ -9,14 +9,24 @@ int main(void)
     expr2.node_type = EXPR_LIT_DOUBLE;
     expr2.data.lit_double = 2.534;
 
+    expr_struct expr = {0};
+    expr.node_type = EXPR_LIT_INT;
+    expr.data.lit_int = 3;
+
     statement_struct st = {0};
     st.stmt_type = STMT_VAL;
     st.data.var_stmt.id_name = "x";
     st.data.var_stmt.codegen_id = 1;
     st.data.var_stmt.init_expr = &expr2;
 
+    statement_struct st2 = {0};
+    st2.stmt_type = STMT_ASSIGN;
+    st2.data.id_stmt.assign_expr = &expr;
+    st2.data.id_stmt.id_name = st.data.var_stmt.id_name;
+
     gen_expression(&expr2);
     gen_statement(&st);
+    gen_statement(&st2);
 
     return 0;
 }
@@ -81,6 +91,10 @@ void gen_statement(statement_struct* statement)
             gen_expression(statement->data.var_stmt.init_expr);
             emit_expr("POPS LF@%s$%zu\n", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             break;   
+        case STMT_ASSIGN:
+            gen_expression(statement->data.id_stmt.assign_expr);
+            emit_expr("POPS LF@%s$%zu\n", statement->data.id_stmt.id_name);
+            break;
         default:
         break;   
     }
