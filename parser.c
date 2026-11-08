@@ -150,6 +150,32 @@ static int parse_optional_main(void) {
 }
 
 /**
+ * @brief checks syntax of definition of function
+ */
+static void parse_func(void) {
+    parse_optional_main(); // returns is_main to function_struct
+    keyword_t_check(KEYWORD_DEF);
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+        next_token();
+        type_t_check(TOKEN_L_PARENTH);
+        parse_params();
+        type_t_check(TOKEN_R_PARENTH);
+        parse_optional_type(); // returns value_type to function_struct
+        type_t_check(TOKEN_ASSIGN);
+        // TODO: implementation of parse_body
+        // temporary body:
+        if (token.type == TOKEN_IDENTIFIER) {
+            free(token.data.id);
+        }
+        next_token();
+        type_t_check(TOKEN_NL);
+    } else {
+        error_exit(ERR_SYN, 0, "Missing identifier after 'def'!");
+    }
+}
+
+/**
  * @brief checks syntax of prolog (import ifj26.*)
  */
 static void parse_prolog(void) {
@@ -168,5 +194,6 @@ static void parse_prolog(void) {
 program_struct *parse_program(void) {
     next_token();
     parse_prolog();
+    parse_func();
     return NULL;
 }
