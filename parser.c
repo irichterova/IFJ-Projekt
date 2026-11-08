@@ -176,6 +176,16 @@ static void parse_func(void) {
 }
 
 /**
+ * @brief checks syntax of list of function or functions
+ */
+static void parse_func_list(void){
+    if(token.type == TOKEN_AT || (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_DEF)){
+        parse_func();
+        parse_func_list();
+    }
+}
+
+/**
  * @brief checks syntax of prolog (import ifj26.*)
  */
 static void parse_prolog(void) {
@@ -194,6 +204,9 @@ static void parse_prolog(void) {
 program_struct *parse_program(void) {
     next_token();
     parse_prolog();
-    parse_func();
+    parse_func_list();
+    if (token.type != TOKEN_EOF){
+        error_exit(ERR_SYN, 0, "Expected end of file!");
+    }
     return NULL;
 }
