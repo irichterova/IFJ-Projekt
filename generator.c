@@ -57,7 +57,7 @@ void gen_expression(expr_struct* expression)
             emit_expr("\n");
             break;
         case EXPR_VARIABLE:
-            newline_emit_expr("%s LF@%c$%zu", msg, expression->data.variable.id_name, expression->data.variable.codegen_id);
+            newline_emit_expr("%s LF@%s$%zu", msg, expression->data.variable.id_name, expression->data.variable.codegen_id);
             break;
         case EXPR_UNA_OP:
             if(expression->result_type == TYPE_INT)
@@ -67,6 +67,24 @@ void gen_expression(expr_struct* expression)
             gen_expression(expression->data.unary_op.operand);
             newline_emit_expr("SUBS");
             break;
+        case EXPR_BIN_OP:
+            gen_expression(expression->data.binary_op.left_operand);
+            gen_expression(expression->data.binary_op.right_operand);
+            switch(expression->data.binary_op.op_type)
+            {
+                case OP_PLUS:
+                    newline_emit_expr("ADDS");
+                    break;
+                case OP_BIN_MINUS:
+                    newline_emit_expr("SUBS");
+                    break;
+                case OP_MULTIPLICATION:
+                    newline_emit_expr("MUL");
+                    break;
+                case OP_DIVISION:
+                    newline_emit_expr("DIV");
+                    break;
+            }
         default:
         break;
     }
