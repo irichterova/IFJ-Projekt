@@ -6,6 +6,40 @@
 
 #include "expression.h"
 
+// Symbols defining the table
+typedef enum {
+    PSA_UNARY_MINUS,
+    PSA_MUL,
+    PSA_DIV,
+    PSA_ADD,
+    PSA_SUB,
+    PSA_LESS,
+    PSA_LESS_EQ,
+    PSA_GREATER,
+    PSA_GREATER_EQ,
+    PSA_EQUAL,
+    PSA_NOT_EQUAL,
+    PSA_ID,
+    PSA_LEFT_B,
+    PSA_RIGHT_B,
+    PSA_START_END,
+    PSA_CAT,  // LISTS
+    PSA_NOT,  // BOOLTHEN
+    PSA_AND,  // BOOLTHEN
+    PSA_OR,   // BOOLTHEN
+    // Below are stack only symbols, not in the table
+    PSA_E,    // Expression E
+    PSA_STOP, // Marker <
+} psa_symbol;
+
+// What can be inside the table
+typedef enum {
+    PSA_SHIFT,  // <
+    PSA_PUSH,   // =
+    PSA_REDUCE, // >
+    PSA_ERROR,  // Empty
+} psa_relation;
+
 /**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
