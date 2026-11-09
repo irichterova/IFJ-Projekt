@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-
 void emit_expr(char *msg_format,...)
 {
     va_list argument;
@@ -113,8 +112,9 @@ void gen_expression(expr_struct* expression)
                 default:
                 break;
             }
+            break;
         case EXPR_CALL_FUNC:
-            for(size_t i = 0; i < expression->data.call_fn.argc; i++)
+            for(int i = 0; i < expression->data.call_fn.argc; i++)
             {
             gen_expression(expression->data.call_fn.args[i]);
             }
@@ -128,19 +128,66 @@ void gen_expression(expr_struct* expression)
 
 void gen_statement(statement_struct* statement)
 {
+    char* msg = "POPS";
     switch(statement->stmt_type)
     {
         case STMT_VAL:
         case STMT_VAR:
             newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             gen_expression(statement->data.var_stmt.init_expr);
-            newline_emit_expr("POPS LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+            newline_emit_expr("%s LF@%s$%zu", msg, statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             break;   
         case STMT_ASSIGN:
             gen_expression(statement->data.id_stmt.assign_expr);
-            newline_emit_expr("POPS LF@%s$%zu", statement->data.id_stmt.id_name, statement->data.id_stmt.codegen_id);
+            newline_emit_expr("%s LF@%s$%zu", msg, statement->data.id_stmt.id_name, statement->data.id_stmt.codegen_id);
+            break;
+        case STMT_EXPR:
+            gen_expression(statement->data.expr_stmt);
+            newline_emit_expr("%s LF@$trash", msg);
             break;
         default:
         break;   
     }
+}
+
+void gen_function(function_struct *function)
+{
+    newline_emit_expr("LABEL fn_%s", function->func_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@$trash");
+    for(int i = 0; i< function->param_argc; i++)
+    {
+     newline_emit_expr("DEFVAR LF@%s$%zu", function->param_args[i].param_name, function->param_args[i].codegen_id);
+    }
+    for(int j = function->param_argc - 1; j >= 0; j--)
+    {
+        newline_emit_expr("POPS LF@%s$%zu", function->param_args[j].param_name, function->param_args[j].codegen_id);
+    }
+    while(function->stmt_body->next != 0)
+    {
+        switch(function->stmt_body->stmt_type)
+        {
+            case STMT_VAL:
+            case STMT_VAR:
+                gen_expression(function->stmt_body->data.expr_stmt);
+                break;
+            case STMT_EXPR:
+                if(function->stmt_body->data.expr_stmt->result_type != TYPE_UNIT)
+                {
+                    gen_expression(function->stmt_body->data.expr_stmt);
+                }
+                else
+                {
+                    gen_expression(function->stmt_body->data.expr_stmt);
+                    newline_emit_expr("POPS LF@$trash");
+                    newline_emit_expr("PUSHS nil@nil");
+                }
+                break;
+            default:
+            break;
+        }
+        function->stmt_body->next = function->stmt_body->next->next;
+    }
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
 }
