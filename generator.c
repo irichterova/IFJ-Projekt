@@ -1,7 +1,20 @@
+/* 
+IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
+*
+@file generator.c
+*
+@date 9-11-2026
+@author xdongop00 Phuong Uyen Dongova
+*/
 #include "generator.h"
 #include <stdio.h>
 #include <stdarg.h>
 
+/*
+    @brief  Prints formatted line of IFJ26code without a newline
+    @param  *msg_format Format of a printed line
+    @param  ...         Substitution for unlimited values to print 
+*/
 void emit_expr(char *msg_format,...)
 {
     va_list argument;
@@ -10,6 +23,11 @@ void emit_expr(char *msg_format,...)
     va_end(argument);
 }
 
+/*
+    @brief Prints formatted line of IFJ26code with a newline
+    @param  *msg_format Format of a printed line
+    @param  ...         Substitution for unlimited values to print 
+*/
 void newline_emit_expr(char *msg_format,...)
 {
     va_list argument;
@@ -19,6 +37,10 @@ void newline_emit_expr(char *msg_format,...)
     putchar('\n');
 }
 
+/*
+    @brief  Prints edited chars of a string based on IFJ26code specifics
+    @param  *str  String which is to be printed 
+*/
 void emit_expr_str(char *str)
 {   
     for(size_t i = 0; str[i] != '\0'; i++)
@@ -35,7 +57,10 @@ void emit_expr_str(char *str)
     }
 }
 
-
+/*
+    @brief  Generate expressions based on their node type 
+    @param  expression  Pointer to a valid expression 
+*/
 void gen_expression(expr_struct* expression)
 {
     char* msg = "PUSHS";
@@ -67,6 +92,7 @@ void gen_expression(expr_struct* expression)
             newline_emit_expr("SUBS");
             break;
         case EXPR_BIN_OP:
+        /* For binar operators, there are two expressions - operands, we have to print out both of them */
             gen_expression(expression->data.binary_op.left_operand);
             gen_expression(expression->data.binary_op.right_operand);
             switch(expression->data.binary_op.op_type)
@@ -81,6 +107,7 @@ void gen_expression(expr_struct* expression)
                     newline_emit_expr("MULS");
                     break;
                 case OP_DIVISION:
+                /* Differentiate dividing signed and unsigned integers */
                     if(expression->result_type == TYPE_INT)
                     {
                     newline_emit_expr("IDIVS");
@@ -114,6 +141,7 @@ void gen_expression(expr_struct* expression)
             }
             break;
         case EXPR_CALL_FUNC:
+        /* For generating expressions in a function, we have to print out every single expression in a function*/
             for(int i = 0; i < expression->data.call_fn.argc; i++)
             {
             gen_expression(expression->data.call_fn.args[i]);
@@ -163,30 +191,42 @@ void gen_function(function_struct *function)
     {
         newline_emit_expr("POPS LF@%s$%zu", function->param_args[j].param_name, function->param_args[j].codegen_id);
     }
-    while(function->stmt_body->next != 0)
+    /* A temporary statement struct to help with readable code*/
+    statement_struct *stmt = function->stmt_body;
+    while(stmt != NULL)
     {
-        switch(function->stmt_body->stmt_type)
+        if(stmt->next != NULL)
+        {
+            gen_statement(stmt);
+        }
+        switch(stmt->stmt_type)
         {
             case STMT_VAL:
             case STMT_VAR:
-                gen_expression(function->stmt_body->data.expr_stmt);
+                gen_statement(stmt);
                 break;
-            case STMT_EXPR:
-                if(function->stmt_body->data.expr_stmt->result_type != TYPE_UNIT)
+            case STMT_EXPR:                    
+                if(stmt->data.expr_stmt->result_type == TYPE_UNIT)
                 {
-                    gen_expression(function->stmt_body->data.expr_stmt);
-                }
-                else
-                {
-                    gen_expression(function->stmt_body->data.expr_stmt);
                     newline_emit_expr("POPS LF@$trash");
+                    newline_emit_expr("PUSHS nil@nil");
+                }
+                break;
+            case STMT_ASSIGN:
+                if(stmt->next != NULL)
+                {
+                   gen_statement(stmt);
+                   newline_emit_expr("POPS LF@%s$%zu", stmt->data.id_stmt.id_name, stmt->data.id_stmt.codegen_id);
+                }
+                else 
+                {
                     newline_emit_expr("PUSHS nil@nil");
                 }
                 break;
             default:
             break;
         }
-        function->stmt_body->next = function->stmt_body->next->next;
+        stmt = stmt->next;
     }
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
