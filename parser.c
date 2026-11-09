@@ -209,12 +209,16 @@ static function_struct *parse_func(void) {
 
 /**
  * @brief checks syntax of list of function or functions
+ * @return first function with pointer to next function, NULL if none
  */
-static void parse_func_list(void) {
+static function_struct *parse_func_list(void) {
     if (token.type == TOKEN_AT ||
         (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_DEF)) {
-        parse_func();
-        parse_func_list();
+        function_struct *func = parse_func();
+        func->next = parse_func_list();
+        return func;
+    } else {
+        return NULL;
     }
 }
 
@@ -235,11 +239,15 @@ static void parse_prolog(void) {
 }
 
 program_struct *parse_program(void) {
+    program_struct *program = calloc(1, sizeof(program_struct));
+    if (program == NULL) {
+        error_exit(ERR_INTERNAL, 0, "Program allocation goes wrong!");
+    }
     next_token();
     parse_prolog();
-    parse_func_list();
+    program->first_func = parse_func_list();
     if (token.type != TOKEN_EOF) {
         error_exit(ERR_SYN, 0, "Expected end of file!");
     }
-    return NULL;
+    return program;
 }
