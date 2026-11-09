@@ -11,7 +11,7 @@
 #include <string.h>
 
 static token_t token;
-static void parse_params_next(void);
+static void parse_params_next(function_struct *func);
 
 /**
  * @brief selects next token from scanner
@@ -42,6 +42,25 @@ static void keyword_t_check(enum keywords_enum t_keyword) {
     } else {
         error_exit(ERR_SYN, 0, "Keyword of token doesn't match!");
     }
+}
+
+/**
+ * @brief adds parameter at end of array of parameters in function
+ * @param func function in which parameter is added
+ * @param p_name name of parameter
+ * @param p_type type of parameter
+ */
+static void add_param(function_struct *func, char *p_name, value_type p_type) {
+    params_struct *array_param =
+        realloc(func->param_args, sizeof(params_struct) * (func->param_argc + 1));
+    if (array_param == NULL) {
+        error_exit(ERR_INTERNAL, 0, "Param allocation goes wrong!");
+    }
+    func->param_args = array_param;
+    func->param_args[func->param_argc].param_name = p_name;
+    func->param_args[func->param_argc].param_type = p_type;
+    func->param_args[func->param_argc].codegen_id = 0; // temporary, semantic will assign
+    func->param_argc++;
 }
 
 /**
@@ -87,37 +106,42 @@ static value_type parse_optional_type(void) {
 
 /**
  * @brief checks syntax of next parameter after comma
+ * @param func struct in which params are stored
  */
-static void parse_params_rest(void) {
+static void parse_params_rest(function_struct *func) {
     if (token.type == TOKEN_IDENTIFIER) {
-        free(token.data.id);
+        char *id_name = token.data.id;
         next_token();
         type_t_check(TOKEN_COLON);
-        parse_type();
-        parse_params_next();
+        value_type param_type = parse_type();
+        add_param(func, id_name, param_type);
+        parse_params_next(func);
     }
 }
 
 /**
  * @brief checks whether there is comma after parameter in function
+ * @param func struct in which params are stored
  */
-static void parse_params_next(void) {
+static void parse_params_next(function_struct *func) {
     if (token.type == TOKEN_COMMA) {
         next_token();
-        parse_params_rest();
+        parse_params_rest(func);
     }
 }
 
 /**
  * @brief checks syntax of parameters in function
+ * @param func struct in which params are stored
  */
-static void parse_params(void) {
+static void parse_params(function_struct *func) {
     if (token.type == TOKEN_IDENTIFIER) {
-        free(token.data.id);
+        char *id_name = token.data.id;
         next_token();
         type_t_check(TOKEN_COLON);
-        parse_type();
-        parse_params_next();
+        value_type param_type = parse_type();
+        add_param(func, id_name, param_type);
+        parse_params_next(func);
     }
 }
 
@@ -165,7 +189,7 @@ static function_struct *parse_func(void) {
         func->func_name = token.data.id;
         next_token();
         type_t_check(TOKEN_L_PARENTH);
-        parse_params();
+        parse_params(func);
         type_t_check(TOKEN_R_PARENTH);
         func->declared_ret_type = parse_optional_type();
         type_t_check(TOKEN_ASSIGN);
