@@ -18,3 +18,14 @@ static void free_params(params_struct *param, int argc) {
     }
     free(param);
 }
+
+/**
+ * @brief frees function in AST
+ * @param func struct of freed function
+ */
+static void free_func(function_struct *func) {
+    free(func->func_name);
+    free_params(func->param_args, func->param_argc);
+    // TODO: free body of the function
+    free(func);
+}
