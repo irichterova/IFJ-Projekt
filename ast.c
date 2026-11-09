@@ -29,3 +29,16 @@ static void free_func(function_struct *func) {
     // TODO: free body of the function
     free(func);
 }
+
+void free_program(program_struct *program) {
+    if (program == NULL) {
+        return;
+    }
+    function_struct *cursor = program->first_func;
+    while (cursor != NULL) {
+        function_struct *next = cursor->next;
+        free_func(cursor);
+        cursor = next;
+    }
+    free(program);
+}
