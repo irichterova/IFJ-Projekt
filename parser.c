@@ -151,17 +151,23 @@ static int parse_optional_main(void) {
 
 /**
  * @brief checks syntax of definition of function
+ * @return function_struct func with is_main, func_name and declared_ret_type
  */
-static void parse_func(void) {
-    parse_optional_main(); // returns is_main to function_struct
+static function_struct *parse_func(void) {
+    int main_found = parse_optional_main();
+    function_struct *func = calloc(1, sizeof(function_struct));
+    if (func == NULL) {
+        error_exit(ERR_INTERNAL, 0, "Function allocation goes wrong!");
+    }
+    func->is_main = main_found;
     keyword_t_check(KEYWORD_DEF);
     if (token.type == TOKEN_IDENTIFIER) {
-        free(token.data.id);
+        func->func_name = token.data.id;
         next_token();
         type_t_check(TOKEN_L_PARENTH);
         parse_params();
         type_t_check(TOKEN_R_PARENTH);
-        parse_optional_type(); // returns value_type to function_struct
+        func->declared_ret_type = parse_optional_type();
         type_t_check(TOKEN_ASSIGN);
         // TODO: implementation of parse_body
         // temporary body:
@@ -170,16 +176,19 @@ static void parse_func(void) {
         }
         next_token();
         type_t_check(TOKEN_NL);
+        return func;
     } else {
         error_exit(ERR_SYN, 0, "Missing identifier after 'def'!");
+        return NULL;
     }
 }
 
 /**
  * @brief checks syntax of list of function or functions
  */
-static void parse_func_list(void){
-    if(token.type == TOKEN_AT || (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_DEF)){
+static void parse_func_list(void) {
+    if (token.type == TOKEN_AT ||
+        (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_DEF)) {
         parse_func();
         parse_func_list();
     }
@@ -205,7 +214,7 @@ program_struct *parse_program(void) {
     next_token();
     parse_prolog();
     parse_func_list();
-    if (token.type != TOKEN_EOF){
+    if (token.type != TOKEN_EOF) {
         error_exit(ERR_SYN, 0, "Expected end of file!");
     }
     return NULL;
