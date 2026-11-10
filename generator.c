@@ -9,7 +9,8 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include "generator.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include <stdbool.h>
+
+static int cycle_counter = 0;
 
 /*
     @brief  Prints formatted line of IFJ26code without a newline
@@ -175,25 +176,25 @@ void gen_statement(statement_struct* statement)
             newline_emit_expr("%s LF@$trash", msg);
             break;
         case STMT_IF:
-            int cycle_count = 1;
+            int if_counter = ++cycle_counter;
             gen_expression(statement->data.if_stmt.if_expr);
             newline_emit_expr("PUSHS bool@false");
-            newline_emit_expr("JUMPIFEQS if_else_%i", cycle_count);
+            newline_emit_expr("JUMPIFEQS if_else_%i", if_counter);
             statement_struct *then_stmts = statement->data.if_stmt.then_stmt;
             while(then_stmts != NULL)
             {
                 gen_statement(then_stmts);
                 then_stmts = then_stmts->next;
             }
-            newline_emit_expr("JUMP if_end_%i", cycle_count);
-            newline_emit_expr("LABEL if_else_%i", cycle_count);
+            newline_emit_expr("JUMP if_end_%i", if_counter);
+            newline_emit_expr("LABEL if_else_%i", if_counter);
             statement_struct *else_stmts = statement->data.if_stmt.else_stmt;
             while(else_stmts != NULL)
             {
                 gen_statement(else_stmts);
                 else_stmts = else_stmts->next;
             }
-            newline_emit_expr("LABEL if_end_%i", cycle_count);
+            newline_emit_expr("LABEL if_end_%i", if_counter);
             break;
         case STMT_RETURN:
             if(statement->data.ret_stmt != NULL)
@@ -207,15 +208,15 @@ void gen_statement(statement_struct* statement)
             newline_emit_expr("JUMP end_%s", statement->data.ret_stmt->data.call_fn.name);
             break;
         case STMT_WHILE:
-            int while_count = 1;
+            int while_counter = ++cycle_counter;
             gen_expression(statement->data.while_lp.while_expr);
-            newline_emit_expr("LABEL while_%i", while_count);
+            newline_emit_expr("LABEL while_%i", while_counter);
             newline_emit_expr("PUSHS bool@false");
-            newline_emit_expr("JUMPIFEQS end_while_%i", while_count);
+            newline_emit_expr("JUMPIFEQS end_while_%i", while_counter);
             gen_statement(statement->data.while_lp.while_body);
             // SKOC ZPET na navesti 
-            newline_emit_expr("JUMP while_%i", while_count);
-            newline_emit_expr("LABEL end_while_%i", while_count);           
+            newline_emit_expr("JUMP while_%i", while_counter);
+            newline_emit_expr("LABEL end_while_%i", while_counter);           
         default:
         break;   
     }
