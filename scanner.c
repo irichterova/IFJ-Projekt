@@ -13,6 +13,7 @@
 #include "scanner.h"
 #include "stack.h"
 #include "buffer.h"
+#include "error.h"
 
 enum states {
     S_START,
@@ -68,6 +69,8 @@ char* keywords_arr[] = {
     "Boolean",
 };
 
+static int line_count = 1;
+
 /**
  * @brief Checks if the identifier is a keyword
  * @param identifier String ending with '\0' representing the identifier to be checked
@@ -93,8 +96,8 @@ int convert_str2int (char* string) {
     char* endptr;
     long long number = strtoll(string, &endptr, 10);
     if (*endptr == '\0' && errno == 0 && number <= INT_MAX) return number;
-    fprintf(stderr, "Error: Invalid number\n");
-    exit(1);   
+    error_exit(1, line_count, "Invalid number");
+    return -1;
 }
 
 /**
@@ -107,8 +110,8 @@ double convert_str2dbl (char* string) {
     char* endptr;
     double number = strtod(string, &endptr);
     if (*endptr == '\0' && errno == 0) return number;
-    fprintf(stderr, "Error: Invalid number\n");
-    exit(1);
+    error_exit(1, line_count, "Invalid number");
+    return -1;
 }
 
 /**
@@ -118,8 +121,7 @@ double convert_str2dbl (char* string) {
  */
 void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
     if ((rule == EOL_REQUIRED && !eol_before_token) || (rule == EOL_FORBIDDEN && eol_before_token)) {
-        fprintf(stderr, "Error: EOL rule not followed\n");
-        exit(2);
+        error_exit(2, line_count, "EOL rule not followed");
     }
 }
 
@@ -141,8 +143,7 @@ void update_indent_stack (stack_t* indent_stack, int space_count, int symbol, to
         stack_pop(indent_stack);
         if (space_count <= stack_top(indent_stack)) token->type = TOKEN_DEDENT;
         else {
-            fprintf(stderr, "Error: Wrong indentation\n");
-            exit(2);
+            error_exit(2, line_count, "Wrong indentation");
         }
     }
 }
@@ -163,13 +164,11 @@ void update_indent_stack (stack_t* indent_stack, int space_count, int symbol, to
 bool handle_indentation (bool tab_at_beginning, bool logical_line_cont, int symbol, bool eol_before_token, 
     int space_count, stack_t* indent_stack, bool file_start, bool* pending_indentation, token_t* token) {
     if (tab_at_beginning) {
-        fprintf(stderr, "Error: Tab can not be at the beginning of a non-empty line\n");
-        exit(1);
+        error_exit(1, line_count, "Tab can not be at the beginning of a non-empty line");
     }
 
     if (logical_line_cont && (symbol != ')') && eol_before_token && (space_count <= stack_top(indent_stack))) {
-        fprintf(stderr, "Error: Invalid indentation in logical line continuation\n");
-        exit(2);
+        error_exit(2, line_count, "Invalid indentation in logical line continuation");
     }
 
     if (!logical_line_cont) {
@@ -234,6 +233,7 @@ token_t get_token(enum eol_rules rule) {
                     break;
                 }
                 else if (symbol == '\n') {
+                    line_count++;
                     eol_before_token = true;
                     tab_at_beginning = false;
                     space_count = 0;
@@ -331,8 +331,7 @@ token_t get_token(enum eol_rules rule) {
                     buffer_init(&string_buffer);
                 }
                 else {
-                    fprintf(stderr, "Error: Invalid character\n");
-                    exit(1);
+                    error_exit(1, line_count, "'%c' is an invalid character", symbol);
                 }
                 break;
             case S_GT:
@@ -381,8 +380,8 @@ token_t get_token(enum eol_rules rule) {
                     return token;
                 }
                 else {
-                    fprintf(stderr, "Error: '&' alone is an invalid character\n");
-                    exit(1);
+                    error_exit(1, line_count, "'&' alone is an invalid character");
+                    break;
                 }
             case S_OR:
                 if (symbol == '|') {
@@ -390,8 +389,8 @@ token_t get_token(enum eol_rules rule) {
                     return token;
                 }
                 else {
-                    fprintf(stderr, "Error: '|' alone is an invalid character\n");
-                    exit(1);
+                    error_exit(1, line_count, "Error: '|' alone is an invalid character");
+                    break;
                 }
             case S_IDENTIF:
                 if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z') || 
@@ -429,13 +428,12 @@ token_t get_token(enum eol_rules rule) {
                 (symbol >= '0' && symbol <= '9') || (symbol == '_')) {
                     state = S_IDENTIF;
                     add_symbol2buffer(&identif_buffer, symbol);
-                    break;
                 }
                 else {
                     buffer_destruct(&identif_buffer);
-                    fprintf(stderr, "Error: '_' alone is not a valid identifier\n");
-                    exit(1);
+                    error_exit(1, line_count, "'_' alone is not a valid identifier");
                 }
+                break;
             case S_INT:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
@@ -467,14 +465,12 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol >= '0' && symbol <= '9') {
                     state = S_INT;
                     add_symbol2buffer(&number_buffer, symbol);
-                    break;
                 }
-                else if (symbol == '_') break;
-                else {
+                else if (symbol != '_') {
                     buffer_destruct(&number_buffer);
-                    fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
-                    exit(1);
+                    error_exit(1, line_count, "'_' in a number must be followed by a digit");
                 }
+                break;
             case S_ZERO:
                 if (symbol == '.') {
                     buffer_init(&number_buffer);
@@ -491,8 +487,8 @@ token_t get_token(enum eol_rules rule) {
                     break;
                 }
                 else if (symbol >= '1' && symbol <= '9') {
-                    fprintf(stderr, "Error: Nonzero literal can not begin with '0'\n");
-                    exit(1);
+                    error_exit(1, line_count, "Nonzero literal can not begin with '0'");
+                    break;
                 }
                 else if (symbol == '0') break;
                 else if (symbol == '_') {
@@ -508,13 +504,11 @@ token_t get_token(enum eol_rules rule) {
             case S_ZERO_UNDERSCORE:
                 if (symbol == '0') {
                     state = S_ZERO;
-                    break;
                 }
-                else if (symbol == '_') break;
-                else {
-                    fprintf(stderr, "Error: '_' in a zero literal must be followed by a '0'\n");
-                    exit(1);
+                else if (symbol != '_') {
+                    error_exit(1, line_count, "'_' in a zero literal must be followed by a '0'");
                 }
+                break;
             case S_PERIOD:
                 if (symbol >= '0' && symbol <= '9') {
                     buffer_init(&number_buffer);
@@ -532,13 +526,12 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
                     state = S_DBL_DECIMAL;
-                    break;
                 }
                 else {
                     buffer_destruct(&number_buffer);
-                    fprintf(stderr, "Error: '.' after a digit must be followed by another digit\n");
-                    exit(1);
+                    error_exit(1, line_count, "'.' after a digit must be followed by another digit");
                 }
+                break;
             case S_DBL_DECIMAL:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
@@ -565,41 +558,36 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
                     state = S_DBL_DECIMAL;
-                    break;
                 }
-                else if (symbol == '_') break;
-                else {
+                else if (symbol != '_') {
                     buffer_destruct(&number_buffer);
-                    fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
-                    exit(1);
+                    error_exit(1, line_count, "'_' in a number must be followed by a digit");
                 }
+                break;
             case S_EXPONENT:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
                     state = S_DBL_EXP;
-                    break;
                 }
                 else if (symbol == '+' || symbol == '-') {
                     add_symbol2buffer(&number_buffer, symbol);
                     state = S_DBL_EXP_SIGN;
-                    break;
                 }
                 else {
                     buffer_destruct(&number_buffer);
-                    fprintf(stderr, "Error: Exponent must be followed by a digit or a sign\n");
-                    exit(1);
+                    error_exit(1, line_count, "Exponent must be followed by a digit or a sign");
                 }
+                break;
             case S_DBL_EXP_SIGN:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
                     state = S_DBL_EXP;
-                    break;
                 }
                 else {
                     buffer_destruct(&number_buffer);
-                    fprintf(stderr, "Error: A sign in an exponent must be followed by a digit\n");
-                    exit(1);
+                    error_exit(1, line_count, "A sign in an exponent must be followed by a digit");
                 }
+                break;
             case S_DBL_EXP:
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
@@ -621,19 +609,16 @@ token_t get_token(enum eol_rules rule) {
                 if (symbol >= '0' && symbol <= '9') {
                     add_symbol2buffer(&number_buffer, symbol);
                     state = S_DBL_EXP;
-                    break;
                 }
-                else if (symbol == '_') break;
-                else {
+                else if (symbol != '_') {
                     buffer_destruct(&number_buffer);
-                    fprintf(stderr, "Error: '_' in a number must be followed by a digit\n");
-                    exit(1);
+                    error_exit(1, line_count, "'_' in a number must be followed by a digit");
                 }
+                break;
             case S_STR:
                 if (symbol == '\\') {
                     empty_string = false;
                     state = S_ESC_SEQ;
-                    break;
                 }
                 else if (symbol == '"') {
                     if (!empty_string) {
@@ -644,50 +629,45 @@ token_t get_token(enum eol_rules rule) {
                     }
                     else {
                         state = S_STR_END;
-                        break;
                     }
                 }
                 else if (symbol == '\n' || symbol == EOF) {
                     buffer_destruct(&string_buffer);
-                    fprintf(stderr, "Error: String not ended correctly\n");
-                    exit(1);
+                    error_exit(1, line_count, "String not ended correctly");
                 }
                 else {
                     empty_string = false;
                     add_symbol2buffer(&string_buffer, symbol);
-                    break;
                 }
+                break;
             case S_ESC_SEQ:
-                if (symbol == '\\') {
-                    add_symbol2buffer(&string_buffer, '\\');
-                    state = S_STR;
-                    break;
+                switch (symbol) {
+                    case '\\':
+                        add_symbol2buffer(&string_buffer, '\\');
+                        state = S_STR; 
+                        break;
+                    case '"':
+                        add_symbol2buffer(&string_buffer, '"');
+                        state = S_STR;
+                        break;
+                    case 'n':
+                        add_symbol2buffer(&string_buffer, '\n');
+                        state = S_STR;
+                        break;
+                    case 'r':
+                        add_symbol2buffer(&string_buffer, '\r');
+                        state = S_STR;
+                        break;
+                    case 't':
+                        add_symbol2buffer(&string_buffer, '\t');
+                        state = S_STR;
+                        break;
+                    default: 
+                        buffer_destruct(&string_buffer);
+                        error_exit(1, line_count, "'\\%c' is an unsupported escape sequence", symbol);
+                        break;
                 }
-                else if (symbol == '"') {
-                    add_symbol2buffer(&string_buffer, '"');
-                    state = S_STR;
-                    break;
-                }
-                else if (symbol == 'n') {
-                    add_symbol2buffer(&string_buffer, '\n');
-                    state = S_STR;
-                    break;
-                }
-                else if (symbol == 'r') {
-                    add_symbol2buffer(&string_buffer, '\r');
-                    state = S_STR;
-                    break;
-                }
-                else if (symbol == 't') {
-                    add_symbol2buffer(&string_buffer, '\t');
-                    state = S_STR;
-                    break;
-                }
-                else {
-                    buffer_destruct(&string_buffer);
-                    fprintf(stderr, "Error: Unsupported escape sequence\n");
-                    exit(1);
-                }
+                break;
             case S_STR_END:
                 if (symbol == '"') {
                     state = S_MULTI_LN_STR;
@@ -703,33 +683,29 @@ token_t get_token(enum eol_rules rule) {
             case S_MULTI_LN_STR:
                 if (symbol == EOF) {
                     buffer_destruct(&string_buffer);
-                    fprintf(stderr, "Error: String not ended correctly\n");
-                    exit(1);
+                    error_exit(1, line_count, "String not ended correctly");
                 }
                 else if (symbol == '"') {
                     state = S_MULTI_LN_STR_END1;
-                    break;
                 }
                 else {
                     add_symbol2buffer(&string_buffer, symbol);
-                    break;
                 }
+                break;
             case S_MULTI_LN_STR_END1:
                 if (symbol == '"') {
                     state = S_MULTI_LN_STR_END2;
-                    break;
                 }
                 else if (symbol != EOF) {
                     add_symbol2buffer(&string_buffer, '"');
                     add_symbol2buffer(&string_buffer, symbol);
                     state = S_MULTI_LN_STR;
-                    break;
                 }
                 else {
                     buffer_destruct(&string_buffer);
-                    fprintf(stderr, "Error: String not ended correctly\n");
-                    exit(1);
+                    error_exit(1, line_count, "String not ended correctly");
                 }
+                break;
             case S_MULTI_LN_STR_END2:
                 if (symbol == '"') {
                     add_symbol2buffer(&string_buffer, '\0');
@@ -742,13 +718,12 @@ token_t get_token(enum eol_rules rule) {
                     add_symbol2buffer(&string_buffer, '"');
                     add_symbol2buffer(&string_buffer, symbol);
                     state = S_MULTI_LN_STR;
-                    break;
                 }
                 else {
                     buffer_destruct(&string_buffer);
-                    fprintf(stderr, "Error: String not ended correctly\n");
-                    exit(1);
+                    error_exit(1, line_count, "String not ended correctly");
                 }
+                break;
             case S_DIV:
                 if (symbol == '/') {
                     state = S_LINE_COM;
@@ -770,6 +745,7 @@ token_t get_token(enum eol_rules rule) {
                 return token;
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
+                    if (symbol == '\n') line_count++;
                     eol_before_token = true;
                     tab_at_beginning = false;
                     space_count = 0;
@@ -781,21 +757,18 @@ token_t get_token(enum eol_rules rule) {
             case S_BLOCK_COM:
                 if (symbol == '*') {
                     state = S_BLOCK_COM_END;
-                    break;
                 }
                 else if (symbol == '/') {
                     state = S_NESTED_COM;
-                    break;
                 }
                 else if (symbol == EOF) {
-                    fprintf(stderr, "Error: Block comment ended incorrectly\n");
-                    exit(1);
+                    error_exit(1, line_count, "Block comment ended incorrectly");
                 }
                 else if (symbol == '\n') {
+                    line_count++;
                     lf_in_comment = true;
-                    break;
                 }
-                else break;
+                break;
             case S_BLOCK_COM_END:
                 if (symbol == '/') {
                     unended_com_cnt--;
@@ -813,10 +786,11 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == '*') break;
                 else if (symbol == EOF) {
-                    fprintf(stderr, "Error: Block comment ended incorrectly\n");
-                    exit(1);
+                    error_exit(1, line_count, "Block comment ended incorrectly");
+                    break;
                 }
                 else if (symbol == '\n') {
+                    line_count++;
                     lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
@@ -829,16 +803,18 @@ token_t get_token(enum eol_rules rule) {
                 }
                 if (symbol == '/') break;
                 else if (symbol == EOF) {
-                    fprintf(stderr, "Error: Block comment ended incorrectly\n");
-                    exit(1);
+                    error_exit(1, line_count, "Block comment ended incorrectly");
+                    break;
                 }
                 else if (symbol == '\n') {
+                    line_count++;
                     lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
             case S_AFTER_BLOCK_COM:
                 if (symbol == '\n' || symbol == EOF) {
+                    if (symbol == '\n') line_count++;
                     eol_before_token = true;
                     tab_at_beginning = false;
                     space_count = 0;
@@ -848,8 +824,8 @@ token_t get_token(enum eol_rules rule) {
                 }
                 else if (symbol == ' ' || symbol == '\t' || symbol == '\r') break;
                 else {
-                   fprintf(stderr, "Error: Multi-line block comment can not be followed by a token\n");
-                   exit(1);
+                   error_exit(1, line_count, "Multi-line block comment can be followed by whitespaces only");
+                   break;
                 }
         }
     }
