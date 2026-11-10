@@ -205,7 +205,6 @@ void gen_statement(statement_struct* statement)
             {
                 newline_emit_expr("PUSHS nil@nil");
             }
-            newline_emit_expr("JUMP end_%s", statement->data.ret_stmt->data.call_fn.name);
             break;
         case STMT_WHILE:
             int while_counter = ++cycle_counter;
@@ -222,9 +221,13 @@ void gen_statement(statement_struct* statement)
     }
 }
 
+static char *func_name = NULL;
+
 void gen_function(function_struct *function)
 {
-    newline_emit_expr("LABEL fn_%s", function->func_name);
+    func_name = function->func_name;
+
+    newline_emit_expr("LABEL fn_%s", func_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$trash");
     for(int i = 0; i< function->param_argc; i++)
@@ -235,43 +238,16 @@ void gen_function(function_struct *function)
     {
         newline_emit_expr("POPS LF@%s$%zu", function->param_args[j].param_name, function->param_args[j].codegen_id);
     }
-
+    /* Generate all statements in a function*/
     statement_struct *stmt = function->stmt_body;
     while(stmt != NULL)
     {
-        if(stmt->next != NULL)
-        {
-            gen_statement(stmt);
-        }
-        switch(stmt->stmt_type)
-        {
-            case STMT_VAL:
-            case STMT_VAR:
-                gen_statement(stmt);
-                break;
-            case STMT_EXPR:                    
-                if(stmt->data.expr_stmt->result_type == TYPE_UNIT)
-                {
-                    newline_emit_expr("POPS LF@$trash");
-                    newline_emit_expr("PUSHS nil@nil");
-                }
-                break;
-            case STMT_ASSIGN:
-                if(stmt->next != NULL)
-                {
-                   gen_statement(stmt);
-                   newline_emit_expr("POPS LF@%s$%zu", stmt->data.id_stmt.id_name, stmt->data.id_stmt.codegen_id);
-                }
-                else 
-                {
-                    newline_emit_expr("PUSHS nil@nil");
-                }
-                break;
-            default:
-            break;
-        }
+        gen_statement(stmt);
         stmt = stmt->next;
     }
+    
+    newline_emit_expr("PUSHS nil@nil");
+    newline_emit_expr("LABEL fn_%s", func_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
