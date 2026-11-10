@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <limits.h>
 #include "scanner.h"
+#include "stack.h"
+#include "buffer.h"
 
 enum states {
     S_START,
@@ -18,6 +20,8 @@ enum states {
     S_LT,
     S_ASSIGN,
     S_NOT,
+    S_AND,
+    S_OR,
     S_DIV,
     S_IDENTIF,
     S_ID_UNDERSCORE,
@@ -43,6 +47,7 @@ enum states {
     S_BLOCK_COM,
     S_BLOCK_COM_END,
     S_NESTED_COM,
+    S_AFTER_BLOCK_COM,
 };
 
 char* keywords_arr[] = {
@@ -59,58 +64,9 @@ char* keywords_arr[] = {
     "Unit",
     "val",
     "var",
-    "while"
+    "while",
+    "Boolean",
 };
-
-typedef struct buffer {
-    char* data;
-    int size;
-    int capacity;
-} buffer_t;
-
-/**
- * @brief Initializes the data structure "buffer"
- * @param buffer Pointer to the buffer to be initialized
- */
-void buffer_init (buffer_t* buffer) {
-    buffer->capacity = 10;
-    buffer->size = 0;
-    buffer->data = malloc (buffer->capacity * sizeof (char));
-    if (!(buffer->data)) exit (99);
-}
-
-/**
- * @brief Doubles the capacity of the buffer 
- * @param buffer Pointer to the buffer whose capacity is to be increased
- */
-void buffer_capacity_increase (buffer_t* buffer) {
-    char* new_data = realloc (buffer->data, buffer->capacity * 2 * sizeof(char));
-    if (!new_data) exit (99);
-    buffer->data = new_data;
-    buffer->capacity = buffer->capacity * 2;
-}
-
-/**
- * @brief Adds the symbol to the buffer
- * @param buffer Pointer to the buffer the symbol is to be added to
- * @param symbol The character to be added to the buffer
- */
-void add_symbol2buffer (buffer_t* buffer, char symbol) {
-    if (buffer->size == buffer->capacity) buffer_capacity_increase(buffer);
-    buffer->data[buffer->size] = symbol;
-    buffer->size++;
-}
-
-/**
- * @brief Destroys the data structure "buffer" 
- * @param buffer Pointer to the buffer to be destroyed
- */
-void buffer_destruct (buffer_t *buffer) {
-    buffer->capacity = 0;
-    buffer->size = 0;
-    free(buffer->data); 
-    buffer->data = NULL;
-}
 
 /**
  * @brief Checks if the identifier is a keyword
@@ -156,27 +112,160 @@ double convert_str2dbl (char* string) {
 }
 
 /**
+ * @brief Checks whether the EOL rule is being followed
+ * @param eol_before_token Indicates whether an EOL is present before the token
+ * @param rule EOL rule that must be followed
+ */
+void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
+    if ((rule == EOL_REQUIRED && !eol_before_token) || (rule == EOL_FORBIDDEN && eol_before_token)) {
+        fprintf(stderr, "Error: EOL rule not followed\n");
+        exit(2);
+    }
+}
+
+/**
+ * @brief Updates the indentation stack
+ * @param indent_stack Indentation stack to be updated
+ * @param space_count Number of spaces at the beginning of the physical line
+ * @param symbol Character most recently read from stdin
+ * @param token Token whose type may be set to TOKEN_INDENT or TOKEN_DEDENT
+ */
+void update_indent_stack (stack_t* indent_stack, int space_count, int symbol, token_t* token) {
+    if (space_count > stack_top(indent_stack)) {
+        ungetc(symbol, stdin);
+        stack_push(indent_stack, space_count);
+        token->type = TOKEN_INDENT;
+    }
+    else if (space_count < stack_top(indent_stack)) {
+        ungetc(symbol, stdin);
+        stack_pop(indent_stack);
+        if (space_count <= stack_top(indent_stack)) token->type = TOKEN_DEDENT;
+        else {
+            fprintf(stderr, "Error: Wrong indentation\n");
+            exit(2);
+        }
+    }
+}
+
+/**
+ * @brief Handles indentation and checks indentation rules
+ * @param tab_at_beginning Indicates whether a tab is at the beginning of a non-empty line
+ * @param logical_line_cont Indicates whether the current line is a logical line continuation
+ * @param symbol Character most recently read from stdin
+ * @param eol_before_token Indicates whether an EOL is present before the token
+ * @param space_count Number of spaces at the beginning of the physical line
+ * @param indent_stack Stack used to track levels of indentation
+ * @param file_start Indicates whether the beginning of the file is being processed
+ * @param pending_indentation Indicates whether indentation is waiting to be processed
+ * @param token Token whose type may be set to TOKEN_INDENT or TOKEN_DEDENT
+ * @return true if indentation was processed; false otherwise
+ */
+bool handle_indentation (bool tab_at_beginning, bool logical_line_cont, int symbol, bool eol_before_token, 
+    int space_count, stack_t* indent_stack, bool file_start, bool* pending_indentation, token_t* token) {
+    if (tab_at_beginning) {
+        fprintf(stderr, "Error: Tab can not be at the beginning of a non-empty line\n");
+        exit(1);
+    }
+
+    if (logical_line_cont && (symbol != ')') && eol_before_token && (space_count <= stack_top(indent_stack))) {
+        fprintf(stderr, "Error: Invalid indentation in logical line continuation\n");
+        exit(2);
+    }
+
+    if (!logical_line_cont) {
+        if ((file_start || eol_before_token) && space_count != stack_top(indent_stack)) {
+            *pending_indentation = true;
+        }
+
+        if (*pending_indentation) {
+            update_indent_stack(indent_stack, space_count, symbol, token);
+
+            if (space_count == stack_top(indent_stack)) *pending_indentation = false;
+
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
+ * @param rule EOL rule determining the permission for the presence of EOL
  * @return Data structure "token" 
  */
-token_t get_token() {
+token_t get_token(enum eol_rules rule) {
     int symbol;
     token_t token = {0};
-    enum states state;
-    state = S_START;
+    enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
-    int unended_com_cnt = 0;
-    bool new_line = false;
     bool empty_string = true;
+    int unended_com_cnt = 0;
+    bool eol_before_token = false;
+    bool lf_in_comment = false;
+    static bool file_start = true;
+    static int space_count = 0;
+    static stack_t indent_stack;
+    static bool stack_initialized = false;
+    static bool pending_indentation = false;
+    static int unended_parenth_cnt = 0;
+    bool logical_line_cont = false;
+    bool tab_at_beginning = false;
     while (1) {
         symbol = getchar();
         switch (state) {
             case S_START:
-                if (symbol == EOF) {
+                if (!stack_initialized) {
+                    stack_init (&indent_stack);
+                    stack_initialized = true;
+                    stack_push(&indent_stack, 0);
+                }
+
+                if (symbol == ' ') {
+                    if (file_start || eol_before_token) {
+                        space_count++;
+                    }
+                    break;
+                }
+                else if (symbol == '\r') break;
+                else if (symbol == '\t') {
+                    if (file_start || eol_before_token) {
+                        tab_at_beginning = true;
+                    }
+                    break;
+                }
+                else if (symbol == '\n') {
+                    eol_before_token = true;
+                    tab_at_beginning = false;
+                    space_count = 0;
+                    if (unended_parenth_cnt != 0) {
+                        logical_line_cont = true;
+                    }
+                    break;
+                }
+                else if (symbol == EOF) {
+                    eol_before_token = true;
+                    check_eol_rule(eol_before_token, rule);
+                    if (stack_top(&indent_stack) != 0) {
+                        stack_pop(&indent_stack);
+                        token.type = TOKEN_DEDENT;
+                        return token;
+                    }
                     token.type = TOKEN_EOF;
                     return token;
                 }
-                else if (symbol == '@') {
+                else if (symbol == '/') {
+                    state = S_DIV;
+                    break;
+                }
+
+                check_eol_rule(eol_before_token, rule);
+
+                if (handle_indentation (tab_at_beginning, logical_line_cont, symbol, eol_before_token, 
+                    space_count, &indent_stack, file_start, &pending_indentation, &token)) return token;      
+
+                file_start = false;
+
+                if (symbol == '@') {
                     token.type = TOKEN_AT;
                     return token;
                 }
@@ -194,10 +283,12 @@ token_t get_token() {
                 }
                 else if (symbol == '.') state = S_PERIOD;
                 else if (symbol == '(') {
+                    unended_parenth_cnt++;
                     token.type = TOKEN_L_PARENTH;
                     return token;
                 }
                 else if (symbol == ')') {
+                    if (unended_parenth_cnt > 0) unended_parenth_cnt--;
                     token.type = TOKEN_R_PARENTH;
                     return token;
                 }
@@ -217,7 +308,8 @@ token_t get_token() {
                     token.type = TOKEN_OP_MUL;
                     return token;
                 }
-                else if (symbol == '/') state = S_DIV;
+                else if (symbol == '&') state = S_AND;
+                else if (symbol == '|') state = S_OR;
                 else if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z')) {
                     state = S_IDENTIF;
                     buffer_init(&identif_buffer);
@@ -237,6 +329,10 @@ token_t get_token() {
                 else if (symbol == '"') {
                     state = S_STR;
                     buffer_init(&string_buffer);
+                }
+                else {
+                    fprintf(stderr, "Error: Invalid character\n");
+                    exit(1);
                 }
                 break;
             case S_GT:
@@ -274,8 +370,27 @@ token_t get_token() {
                     token.type = TOKEN_OP_NEQ;
                     return token;
                 }
+                else if (symbol != EOF) {
+                    ungetc(symbol, stdin);
+                }
+                token.type = TOKEN_OP_NOT;
+                return token;
+            case S_AND:
+                if (symbol == '&') {
+                    token.type = TOKEN_OP_AND;
+                    return token;
+                }
                 else {
-                    fprintf(stderr, "Error: Expected '=' after '!'\n");
+                    fprintf(stderr, "Error: '&' alone is an invalid character\n");
+                    exit(1);
+                }
+            case S_OR:
+                if (symbol == '|') {
+                    token.type = TOKEN_OP_OR;
+                    return token;
+                }
+                else {
+                    fprintf(stderr, "Error: '|' alone is an invalid character\n");
                     exit(1);
                 }
             case S_IDENTIF:
@@ -295,8 +410,18 @@ token_t get_token() {
                     buffer_destruct(&identif_buffer);
                 }
                 else {
-                    token.type = TOKEN_IDENTIFIER;
-                    token.data.id = identif_buffer.data;
+                    if (strcmp("true", identif_buffer.data) == 0) {
+                        buffer_destruct(&identif_buffer);
+                        token.type = TOKEN_TRUE_LITERAL;
+                    }
+                    else if (strcmp("false", identif_buffer.data) == 0) {
+                        buffer_destruct(&identif_buffer);
+                        token.type = TOKEN_FALSE_LITERAL;
+                    }
+                    else {
+                        token.type = TOKEN_IDENTIFIER;
+                        token.data.id = identif_buffer.data;
+                    }
                 }
                 return token;
             case S_ID_UNDERSCORE:
@@ -637,12 +762,20 @@ token_t get_token() {
                 else if (symbol != EOF) {
                     ungetc (symbol, stdin);
                 }
+                check_eol_rule(eol_before_token, rule);
+                if (handle_indentation (tab_at_beginning, logical_line_cont, symbol, eol_before_token, 
+                    space_count, &indent_stack, file_start, &pending_indentation, &token)) return token;
+                file_start = false;
                 token.type = TOKEN_OP_DIV;
                 return token;
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
-                    token.type = TOKEN_NL;
-                    return token;
+                    eol_before_token = true;
+                    tab_at_beginning = false;
+                    space_count = 0;
+                    if (unended_parenth_cnt != 0) logical_line_cont = true;
+                    state = S_START;
+                    break;
                 }
                 else break;
             case S_BLOCK_COM:
@@ -659,7 +792,7 @@ token_t get_token() {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
+                    lf_in_comment = true;
                     break;
                 }
                 else break;
@@ -667,11 +800,12 @@ token_t get_token() {
                 if (symbol == '/') {
                     unended_com_cnt--;
                     if (unended_com_cnt == 0) {
-                        if (new_line) {
-                            token.type = TOKEN_NL;
-                            return token;
+                        if (lf_in_comment) {
+                            state = S_AFTER_BLOCK_COM;
+                            break;
                         }
                         else {
+                            file_start = false;
                             state = S_START;
                             break;
                         }
@@ -683,7 +817,7 @@ token_t get_token() {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
+                    lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
@@ -699,10 +833,24 @@ token_t get_token() {
                     exit(1);
                 }
                 else if (symbol == '\n') {
-                    new_line = true;
+                    lf_in_comment = true;
                 }
                 state = S_BLOCK_COM;
                 break;
+            case S_AFTER_BLOCK_COM:
+                if (symbol == '\n' || symbol == EOF) {
+                    eol_before_token = true;
+                    tab_at_beginning = false;
+                    space_count = 0;
+                    if (unended_parenth_cnt != 0) logical_line_cont = true;
+                    state = S_START;
+                    break;
+                }
+                else if (symbol == ' ' || symbol == '\t' || symbol == '\r') break;
+                else {
+                   fprintf(stderr, "Error: Multi-line block comment can not be followed by a token\n");
+                   exit(1);
+                }
         }
     }
 }
