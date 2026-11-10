@@ -173,6 +173,28 @@ void gen_statement(statement_struct* statement)
             gen_expression(statement->data.expr_stmt);
             newline_emit_expr("%s LF@$trash", msg);
             break;
+        case STMT_IF:
+            int cycle_count = 1;
+            gen_expression(statement->data.if_stmt.if_expr);
+            newline_emit_expr("PUSHS bool@false");
+            newline_emit_expr("JUMPIFEQS if_else_%i", cycle_count);
+            statement_struct *then_stmts = statement->data.if_stmt.then_stmt;
+            while(then_stmts != NULL)
+            {
+                gen_statement(then_stmts);
+                then_stmts = then_stmts->next;
+            }
+            newline_emit_expr("JUMP if_end_%i", cycle_count);
+            newline_emit_expr("LABEL if_else_%i", cycle_count);
+            statement_struct *else_stmts = statement->data.if_stmt.else_stmt;
+            while(else_stmts != NULL)
+            {
+                gen_statement(else_stmts);
+                else_stmts = else_stmts->next;
+            }
+            newline_emit_expr("LABEL if_end_%i", cycle_count++);
+            break;
+            
         default:
         break;   
     }
