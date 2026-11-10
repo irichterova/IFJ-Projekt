@@ -9,6 +9,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include "generator.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 /*
     @brief  Prints formatted line of IFJ26code without a newline
@@ -192,9 +193,19 @@ void gen_statement(statement_struct* statement)
                 gen_statement(else_stmts);
                 else_stmts = else_stmts->next;
             }
-            newline_emit_expr("LABEL if_end_%i", cycle_count++);
+            newline_emit_expr("LABEL if_end_%i", cycle_count);
             break;
-            
+        case STMT_RETURN:
+            if(statement->data.ret_stmt != NULL)
+            {
+                gen_expression(statement->data.ret_stmt);
+            }
+            else 
+            {
+                newline_emit_expr("PUSHS nil@nil");
+            }
+            newline_emit_expr("JUMP end_%s", statement->data.ret_stmt->data.call_fn.name);
+            break;
         default:
         break;   
     }
@@ -213,7 +224,7 @@ void gen_function(function_struct *function)
     {
         newline_emit_expr("POPS LF@%s$%zu", function->param_args[j].param_name, function->param_args[j].codegen_id);
     }
-    /* A temporary statement struct to help with readable code*/
+
     statement_struct *stmt = function->stmt_body;
     while(stmt != NULL)
     {
