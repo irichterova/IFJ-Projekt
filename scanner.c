@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -187,11 +186,6 @@ bool handle_indentation (bool tab_at_beginning, bool logical_line_cont, int symb
     return false;
 }
 
-/**
- * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
- * @param rule EOL rule determining the permission for the presence of EOL
- * @return Data structure "token" 
- */
 token_t get_token(enum eol_rules rule) {
     int symbol;
     token_t token = {0};
@@ -248,9 +242,11 @@ token_t get_token(enum eol_rules rule) {
                     if (stack_top(&indent_stack) != 0) {
                         stack_pop(&indent_stack);
                         token.type = TOKEN_DEDENT;
+                        token.after_eol = eol_before_token;
                         return token;
                     }
                     token.type = TOKEN_EOF;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == '/') {
@@ -261,35 +257,44 @@ token_t get_token(enum eol_rules rule) {
                 check_eol_rule(eol_before_token, rule);
 
                 if (handle_indentation (tab_at_beginning, logical_line_cont, symbol, eol_before_token, 
-                    space_count, &indent_stack, file_start, &pending_indentation, &token)) return token;      
+                    space_count, &indent_stack, file_start, &pending_indentation, &token)) {
+                        token.after_eol = eol_before_token;
+                        return token;  
+                    }    
 
                 file_start = false;
 
                 if (symbol == '@') {
                     token.type = TOKEN_AT;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == ':') {
                     token.type = TOKEN_COLON;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == ';') {
                     token.type = TOKEN_SEMICOLON;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == ',') {
                     token.type = TOKEN_COMMA;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == '.') state = S_PERIOD;
                 else if (symbol == '(') {
                     unended_parenth_cnt++;
                     token.type = TOKEN_L_PARENTH;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == ')') {
                     if (unended_parenth_cnt > 0) unended_parenth_cnt--;
                     token.type = TOKEN_R_PARENTH;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == '>') state = S_GT;
@@ -298,14 +303,17 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol == '!') state = S_NOT;
                 else if (symbol == '+') {
                     token.type = TOKEN_OP_ADD;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == '-') {
                     token.type = TOKEN_OP_SUB;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == '*') {
                     token.type = TOKEN_OP_MUL;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol == '&') state = S_AND;
@@ -337,46 +345,55 @@ token_t get_token(enum eol_rules rule) {
             case S_GT:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_GE;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
                 token.type = TOKEN_OP_GT;
+                token.after_eol = eol_before_token;
                 return token;
             case S_LT:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_LE;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
                 token.type = TOKEN_OP_LT;
+                token.after_eol = eol_before_token;
                 return token;
             case S_ASSIGN:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_EQ;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
                 token.type = TOKEN_ASSIGN;
+                token.after_eol = eol_before_token;
                 return token;
             case S_NOT:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_NEQ;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
                 token.type = TOKEN_OP_NOT;
+                token.after_eol = eol_before_token;
                 return token;
             case S_AND:
                 if (symbol == '&') {
                     token.type = TOKEN_OP_AND;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else {
@@ -386,10 +403,11 @@ token_t get_token(enum eol_rules rule) {
             case S_OR:
                 if (symbol == '|') {
                     token.type = TOKEN_OP_OR;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else {
-                    error_exit(1, line_count, "Error: '|' alone is an invalid character");
+                    error_exit(1, line_count, "'|' alone is an invalid character");
                     break;
                 }
             case S_IDENTIF:
@@ -422,6 +440,7 @@ token_t get_token(enum eol_rules rule) {
                         token.data.id = identif_buffer.data;
                     }
                 }
+                token.after_eol = eol_before_token;
                 return token;
             case S_ID_UNDERSCORE:
                 if ((symbol >= 'A' && symbol <= 'Z') || (symbol >= 'a' && symbol <= 'z') || 
@@ -459,6 +478,7 @@ token_t get_token(enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_INT_LITERAL;
                 token.data.int_value = convert_str2int(number_buffer.data);
+                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
                 return token;
             case S_INT_UNDERSCORE:
@@ -500,6 +520,7 @@ token_t get_token(enum eol_rules rule) {
                 }
                 token.type = TOKEN_INT_LITERAL;
                 token.data.int_value = 0;
+                token.after_eol = eol_before_token;
                 return token;
             case S_ZERO_UNDERSCORE:
                 if (symbol == '0') {
@@ -521,6 +542,7 @@ token_t get_token(enum eol_rules rule) {
                     ungetc(symbol, stdin);
                 }
                 token.type = TOKEN_PERIOD;
+                token.after_eol = eol_before_token;
                 return token;
             case S_INT_PERIOD:
                 if (symbol >= '0' && symbol <= '9') {
@@ -552,6 +574,7 @@ token_t get_token(enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_DBL_LITERAL;
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
+                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
                 return token;
             case S_DBL_DECIMAL_UNDERSCORE:
@@ -603,6 +626,7 @@ token_t get_token(enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_DBL_LITERAL;
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
+                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
                 return token;
             case S_DBL_EXP_UNDERSCORE:
@@ -625,6 +649,7 @@ token_t get_token(enum eol_rules rule) {
                         add_symbol2buffer(&string_buffer, '\0');
                         token.type = TOKEN_STR_LITERAL;
                         token.data.str_value = string_buffer.data;
+                        token.after_eol = eol_before_token;
                         return token;
                     }
                     else {
@@ -664,7 +689,7 @@ token_t get_token(enum eol_rules rule) {
                         break;
                     default: 
                         buffer_destruct(&string_buffer);
-                        error_exit(1, line_count, "'\\%c' is an unsupported escape sequence", symbol);
+                        error_exit(1, line_count, "Unsupported escape sequence");
                         break;
                 }
                 break;
@@ -679,6 +704,7 @@ token_t get_token(enum eol_rules rule) {
                 add_symbol2buffer(&string_buffer, '\0');
                 token.type = TOKEN_STR_LITERAL;
                 token.data.str_value = string_buffer.data;
+                token.after_eol = eol_before_token;
                 return token;
             case S_MULTI_LN_STR:
                 if (symbol == EOF) {
@@ -689,6 +715,7 @@ token_t get_token(enum eol_rules rule) {
                     state = S_MULTI_LN_STR_END1;
                 }
                 else {
+                    if (symbol == '\n') line_count++;
                     add_symbol2buffer(&string_buffer, symbol);
                 }
                 break;
@@ -697,6 +724,7 @@ token_t get_token(enum eol_rules rule) {
                     state = S_MULTI_LN_STR_END2;
                 }
                 else if (symbol != EOF) {
+                    if (symbol == '\n') line_count++;
                     add_symbol2buffer(&string_buffer, '"');
                     add_symbol2buffer(&string_buffer, symbol);
                     state = S_MULTI_LN_STR;
@@ -711,9 +739,11 @@ token_t get_token(enum eol_rules rule) {
                     add_symbol2buffer(&string_buffer, '\0');
                     token.type = TOKEN_STR_LITERAL;
                     token.data.str_value = string_buffer.data;
+                    token.after_eol = eol_before_token;
                     return token;
                 }
                 else if (symbol != EOF) {
+                    if (symbol == '\n') line_count++;
                     add_symbol2buffer(&string_buffer, '"');
                     add_symbol2buffer(&string_buffer, '"');
                     add_symbol2buffer(&string_buffer, symbol);
@@ -732,6 +762,7 @@ token_t get_token(enum eol_rules rule) {
                 else if (symbol == '*') {
                     state = S_BLOCK_COM;
                     unended_com_cnt++;
+                    lf_in_comment = false;
                     break;
                 }
                 else if (symbol != EOF) {
@@ -739,9 +770,13 @@ token_t get_token(enum eol_rules rule) {
                 }
                 check_eol_rule(eol_before_token, rule);
                 if (handle_indentation (tab_at_beginning, logical_line_cont, symbol, eol_before_token, 
-                    space_count, &indent_stack, file_start, &pending_indentation, &token)) return token;
+                    space_count, &indent_stack, file_start, &pending_indentation, &token)) {
+                        token.after_eol = eol_before_token;
+                        return token;
+                    }
                 file_start = false;
                 token.type = TOKEN_OP_DIV;
+                token.after_eol = eol_before_token;
                 return token;
             case S_LINE_COM:
                 if (symbol == '\n' || symbol == EOF) {
