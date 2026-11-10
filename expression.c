@@ -6,6 +6,8 @@
 
 #include "expression.h"
 
+#define PSA_TABLE_SIZE 19
+
 // Symbols defining the table
 typedef enum {
     PSA_UNARY_MINUS,
@@ -40,6 +42,10 @@ typedef enum {
     PSA_ERROR,  // Empty
 } psa_relation;
 
+static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
+    
+};
+
 /**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
@@ -49,6 +55,8 @@ typedef enum {
 expr_struct *parse_expr(token_t first, token_t *next) {
     (void)first; // TODO: Remove when implemented
     (void)next;
+
+    (void)precedence_table; // TODO: Remove when used
 
     return NULL;
 }
@@ -64,6 +72,8 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)first; // TODO: Remove when implemented
     (void)second;
     (void)next;
+
+    (void)precedence_table; // TODO: Remove when used
 
     return NULL;
 }
