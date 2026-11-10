@@ -206,6 +206,16 @@ void gen_statement(statement_struct* statement)
             }
             newline_emit_expr("JUMP end_%s", statement->data.ret_stmt->data.call_fn.name);
             break;
+        case STMT_WHILE:
+            int while_count = 1;
+            gen_expression(statement->data.while_lp.while_expr);
+            newline_emit_expr("LABEL while_%i", while_count);
+            newline_emit_expr("PUSHS bool@false");
+            newline_emit_expr("JUMPIFEQS end_while_%i", while_count);
+            gen_statement(statement->data.while_lp.while_body);
+            // SKOC ZPET na navesti 
+            newline_emit_expr("JUMP while_%i", while_count);
+            newline_emit_expr("LABEL end_while_%i", while_count);           
         default:
         break;   
     }
