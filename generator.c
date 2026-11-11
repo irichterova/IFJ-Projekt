@@ -10,6 +10,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include <stdio.h>
 #include <stdarg.h>
 
+//Global counter for cycles (if, while)
 static int cycle_counter = 0;
 
 /*
@@ -56,6 +57,41 @@ void emit_expr_str(char *str)
         {
             emit_expr("%c", c);
         }
+    }
+}
+
+int gen_code(program_struct *program_code, FILE *output)
+{
+    newline_emit_expr(".IFJcode26");
+    newline_emit_expr("CREATEFRAME");
+    newline_emit_expr("CALL fn_main");
+    newline_emit_expr("CLEARS");
+    newline_emit_expr("EXIT int@0");
+
+    return 0;
+}
+
+void emit_defvar(statement_struct *statement)
+{
+    while(statement != NULL)
+    {
+        switch(statement->stmt_type)
+        {
+            case STMT_VAL:
+            case STMT_VAR:
+                newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+                break;
+            case STMT_IF:
+                emit_defvar(statement->data.if_stmt.then_stmt);
+                emit_defvar(statement->data.if_stmt.then_stmt);
+                break;
+            case STMT_WHILE:
+                emit_defvar(statement->data.while_lp.while_body);
+                break; 
+            default:
+            break;           
+        }
+        statement = statement->next;
     }
 }
 
@@ -156,6 +192,9 @@ void gen_expression(expr_struct* expression)
     }
 }
 
+/*  @brief   Generate statements for all statement types
+    @param   statement  Valid pointer to a statement to generate
+*/
 void gen_statement(statement_struct* statement)
 {
     char* msg = "POPS";
@@ -163,7 +202,6 @@ void gen_statement(statement_struct* statement)
     {
         case STMT_VAL:
         case STMT_VAR:
-            newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             gen_expression(statement->data.var_stmt.init_expr);
             newline_emit_expr("%s LF@%s$%zu", msg, statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             break;   
