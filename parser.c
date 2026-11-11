@@ -173,6 +173,22 @@ static int parse_optional_main(void) {
 }
 
 /**
+ * @brief checks syntax of body in function
+ */
+static void parse_body(void) {
+    if (token.type == TOKEN_INDENT){
+        // TODO: Implementation of statement rule
+    } else if(token.after_eol){
+        error_exit(ERR_SYN, 0, "Expected indent after assign token!");
+    } else{
+        if (token.type == TOKEN_IDENTIFIER) {
+            free(token.data.id);
+        }
+        next_token(EOL_REQUIRED);
+    }
+}
+
+/**
  * @brief checks syntax of definition of function
  * @return function_struct func with is_main, func_name and declared_ret_type
  */
@@ -192,15 +208,7 @@ static function_struct *parse_func(void) {
         type_t_check(TOKEN_R_PARENTH, EOL_FORBIDDEN);
         func->declared_ret_type = parse_optional_type();
         type_t_check(TOKEN_ASSIGN, EOL_OPTIONAL);
-        // TODO: implementation of parse_body
-        // temporary body:
-        if(token.after_eol && token.type != TOKEN_INDENT){
-            error_exit(ERR_SYN, 0, "Expected indent after assign token!");
-        }
-        if (token.type == TOKEN_IDENTIFIER) {
-            free(token.data.id);
-        }
-        next_token(EOL_REQUIRED);
+        parse_body();
         return func;
     } else {
         error_exit(ERR_SYN, 0, "Missing identifier after 'def'!");
