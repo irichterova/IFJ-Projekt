@@ -198,7 +198,10 @@ static void parse_statement_next(void) {
  */
 static void parse_body(void) {
     if (token.type == TOKEN_INDENT) {
-        // TODO: Implementation of statement rule
+        next_token(EOL_OPTIONAL);
+        parse_statement();
+        parse_statement_next();
+        type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
     } else if (token.after_eol) {
         error_exit(ERR_SYN, 0, "Expected indent after assign token!");
     } else {
