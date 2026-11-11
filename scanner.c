@@ -186,7 +186,11 @@ bool handle_indentation (bool tab_at_beginning, bool logical_line_cont, int symb
     return false;
 }
 
-token_t get_token(enum eol_rules rule) {
+int get_line_number () {
+    return line_count;
+}
+
+token_t get_token (enum eol_rules rule) {
     int symbol;
     token_t token = {0};
     enum states state = S_START;
