@@ -12,6 +12,9 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 
 //Global counter for cycles (if, while)
 static int cycle_counter = 0;
+static char *func_name = NULL;
+static int if_counter = 0;
+static int while_counter = 0;
 
 /*
     @brief  Prints formatted line of IFJ26code without a newline
@@ -64,9 +67,25 @@ int gen_code(program_struct *program_code, FILE *output)
 {
     newline_emit_expr(".IFJcode26");
     newline_emit_expr("CREATEFRAME");
-    newline_emit_expr("CALL fn_main");
+    function_struct *func = program_code->first_func;
+    /* Calling main first */
+    while(func != NULL)
+    {
+        if(func->is_main == 1)
+        {
+            newline_emit_expr("CALL fn_%s", func->func_name);
+        }
+        else
+        func = func->next;
+    }
     newline_emit_expr("CLEARS");
     newline_emit_expr("EXIT int@0");
+    while(func != NULL && func->is_main == 0)
+    {
+        gen_function(func);
+
+        func = func->next;
+    }
 
     return 0;
 }
@@ -79,11 +98,16 @@ void emit_defvar(statement_struct *statement)
         {
             case STMT_VAL:
             case STMT_VAR:
+                if(statement->data.var_stmt.init_expr == NULL)
+                {
+                    newline_emit_expr("PUSHS nil@nil");
+                    break;
+                }
                 newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
                 break;
             case STMT_IF:
                 emit_defvar(statement->data.if_stmt.then_stmt);
-                emit_defvar(statement->data.if_stmt.then_stmt);
+                emit_defvar(statement->data.if_stmt.else_stmt);
                 break;
             case STMT_WHILE:
                 emit_defvar(statement->data.while_lp.while_body);
@@ -130,13 +154,37 @@ void gen_expression(expr_struct* expression)
             newline_emit_expr("SUBS");
             break;
         case EXPR_BIN_OP:
+        {
         /* For binar operators, there are two expressions - operands, we have to print out both of them */
-            gen_expression(expression->data.binary_op.left_operand);
-            gen_expression(expression->data.binary_op.right_operand);
+            expr_struct *left_op = expression->data.binary_op.left_operand;
+            expr_struct *right_op = expression->data.binary_op.right_operand;
+            value_type left_type = left_op->result_type;
+            value_type right_type = right_op->result_type;
+            gen_expression(left_op);
+            if(left_type == TYPE_INT && right_type == TYPE_DOUBLE)
+            {
+                newline_emit_expr("INT2FLOATS");
+            }
+            gen_expression(right_op);
+            if(right_type == TYPE_INT && left_type == TYPE_DOUBLE)
+            {
+                newline_emit_expr("INT2FLOATS");
+            }
+    
             switch(expression->data.binary_op.op_type)
             {
                 case OP_PLUS:
-                    newline_emit_expr("ADDS");
+                    if(expression->result_type == TYPE_STRING)
+                    {
+                        newline_emit_expr("POPS GF@$tmp-str2");
+                        newline_emit_expr("POPS GF@$tmp-str1");
+                        newline_emit_expr("CONCAT GF@$tmp-str1 GF@$tmp-str1 GF@$tmp-str2");
+                        newline_emit_expr("PUSHS GF@$tmp-str1");
+                    }
+                    else
+                    {
+                        newline_emit_expr("ADDS");
+                    }
                     break;
                 case OP_BIN_MINUS:
                     newline_emit_expr("SUBS");
@@ -178,6 +226,7 @@ void gen_expression(expr_struct* expression)
                 break;
             }
             break;
+        }
         case EXPR_CALL_FUNC:
         /* For generating expressions in a function, we have to print out every single expression in a function*/
             for(int i = 0; i < expression->data.call_fn.argc; i++)
@@ -191,6 +240,7 @@ void gen_expression(expr_struct* expression)
         break;
     }
 }
+
 
 /*  @brief   Generate statements for all statement types
     @param   statement  Valid pointer to a statement to generate
@@ -214,7 +264,7 @@ void gen_statement(statement_struct* statement)
             newline_emit_expr("%s LF@$trash", msg);
             break;
         case STMT_IF:
-            int if_counter = ++cycle_counter;
+            if_counter = ++cycle_counter;
             gen_expression(statement->data.if_stmt.if_expr);
             newline_emit_expr("PUSHS bool@false");
             newline_emit_expr("JUMPIFEQS if_else_%i", if_counter);
@@ -243,9 +293,10 @@ void gen_statement(statement_struct* statement)
             {
                 newline_emit_expr("PUSHS nil@nil");
             }
+            newline_emit_expr("JUMP end_%s", func_name);
             break;
         case STMT_WHILE:
-            int while_counter = ++cycle_counter;
+            while_counter = ++cycle_counter;
             gen_expression(statement->data.while_lp.while_expr);
             newline_emit_expr("LABEL while_%i", while_counter);
             newline_emit_expr("PUSHS bool@false");
@@ -253,13 +304,12 @@ void gen_statement(statement_struct* statement)
             gen_statement(statement->data.while_lp.while_body);
             // SKOC ZPET na navesti 
             newline_emit_expr("JUMP while_%i", while_counter);
-            newline_emit_expr("LABEL end_while_%i", while_counter);           
+            newline_emit_expr("LABEL end_while_%i", while_counter); 
+            break;          
         default:
         break;   
     }
 }
-
-static char *func_name = NULL;
 
 void gen_function(function_struct *function)
 {
@@ -272,6 +322,7 @@ void gen_function(function_struct *function)
     {
      newline_emit_expr("DEFVAR LF@%s$%zu", function->param_args[i].param_name, function->param_args[i].codegen_id);
     }
+    emit_defvar(function->stmt_body);
     for(int j = function->param_argc - 1; j >= 0; j--)
     {
         newline_emit_expr("POPS LF@%s$%zu", function->param_args[j].param_name, function->param_args[j].codegen_id);
@@ -285,7 +336,7 @@ void gen_function(function_struct *function)
     }
     
     newline_emit_expr("PUSHS nil@nil");
-    newline_emit_expr("LABEL fn_%s", func_name);
+    newline_emit_expr("LABEL end_%s", func_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
