@@ -72,6 +72,7 @@ typedef struct def_var {
 typedef struct id_assign {
     char *id_name;
     size_t codegen_id;
+    value_type id_type;
     struct expr_struct *assign_expr;
 } id_assign;
 
