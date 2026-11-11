@@ -184,6 +184,16 @@ static void parse_statement(void) {
 }
 
 /**
+ * @brief checks syntax of remaining statements until dedent
+ */
+static void parse_statement_next(void) {
+    if (token.type != TOKEN_DEDENT) {
+        parse_statement();
+        parse_statement_next();
+    }
+}
+
+/**
  * @brief checks syntax of body in function
  */
 static void parse_body(void) {
