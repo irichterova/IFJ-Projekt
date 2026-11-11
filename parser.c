@@ -173,14 +173,25 @@ static int parse_optional_main(void) {
 }
 
 /**
+ * @brief checks syntax of statement in body
+ */
+static void parse_statement(void) {
+    // temporary for tests:
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+    }
+    next_token(EOL_REQUIRED);
+}
+
+/**
  * @brief checks syntax of body in function
  */
 static void parse_body(void) {
-    if (token.type == TOKEN_INDENT){
+    if (token.type == TOKEN_INDENT) {
         // TODO: Implementation of statement rule
-    } else if(token.after_eol){
+    } else if (token.after_eol) {
         error_exit(ERR_SYN, 0, "Expected indent after assign token!");
-    } else{
+    } else {
         if (token.type == TOKEN_IDENTIFIER) {
             free(token.data.id);
         }
