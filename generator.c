@@ -13,9 +13,6 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 //Global counter for cycles (if, while)
 static int cycle_counter = 0;
 static char *func_name = NULL;
-static int if_counter = 0;
-static int while_counter = 0;
-
 /*
     @brief  Prints formatted line of IFJ26code without a newline
     @param  *msg_format Format of a printed line
@@ -67,26 +64,26 @@ int gen_code(program_struct *program_code, FILE *output)
 {
     newline_emit_expr(".IFJcode26");
     newline_emit_expr("CREATEFRAME");
-    function_struct *func = program_code->first_func;
+    function_struct *main_func = program_code->first_func;
+
     /* Calling main first */
-    while(func != NULL)
+    while(main_func != NULL)
     {
-        if(func->is_main == 1)
+        if(main_func->is_main == 1)
         {
-            newline_emit_expr("CALL fn_%s", func->func_name);
+            newline_emit_expr("CALL fn_%s", main_func->func_name);
+            break;
         }
         else
-        func = func->next;
+        main_func = main_func->next;
     }
     newline_emit_expr("CLEARS");
     newline_emit_expr("EXIT int@0");
-    while(func != NULL && func->is_main == 0)
+
+    for(function_struct *f = program_code->first_func; f != NULL; f = f->next)
     {
-        gen_function(func);
-
-        func = func->next;
+        gen_function(f);
     }
-
     return 0;
 }
 
@@ -252,18 +249,34 @@ void gen_statement(statement_struct* statement)
     {
         case STMT_VAL:
         case STMT_VAR:
-            gen_expression(statement->data.var_stmt.init_expr);
+        {
+            expr_struct *var_init = statement->data.var_stmt.init_expr;
+            gen_expression(var_init);
+            if(statement->data.var_stmt.declared_type == TYPE_DOUBLE && var_init->result_type == TYPE_INT)
+            {
+                newline_emit_expr("INT2FLOATS");
+            }
             newline_emit_expr("%s LF@%s$%zu", msg, statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             break;   
+        }
         case STMT_ASSIGN:
-            gen_expression(statement->data.id_stmt.assign_expr);
+        {
+            expr_struct *asgn_expr = statement->data.id_stmt.assign_expr;
+            gen_expression(asgn_expr);
+            if(statement->data.id_stmt.id_type == TYPE_DOUBLE && asgn_expr->result_type == TYPE_INT)
+            {
+                newline_emit_expr("INT2FLOATS");
+            }
             newline_emit_expr("%s LF@%s$%zu", msg, statement->data.id_stmt.id_name, statement->data.id_stmt.codegen_id);
             break;
+        }
         case STMT_EXPR:
             gen_expression(statement->data.expr_stmt);
             newline_emit_expr("%s LF@$trash", msg);
             break;
         case STMT_IF:
+        {
+            int if_counter = 0;
             if_counter = ++cycle_counter;
             gen_expression(statement->data.if_stmt.if_expr);
             newline_emit_expr("PUSHS bool@false");
@@ -284,9 +297,14 @@ void gen_statement(statement_struct* statement)
             }
             newline_emit_expr("LABEL if_end_%i", if_counter);
             break;
+        }
         case STMT_RETURN:
             if(statement->data.ret_stmt != NULL)
             {
+                if(statement->data.ret_stmt->result_type == TYPE_DOUBLE)
+                {
+                    newline_emit_expr("INT2FLOATS");
+                }
                 gen_expression(statement->data.ret_stmt);
             }
             else 
@@ -296,6 +314,8 @@ void gen_statement(statement_struct* statement)
             newline_emit_expr("JUMP end_%s", func_name);
             break;
         case STMT_WHILE:
+        {
+            int while_counter = 0;
             while_counter = ++cycle_counter;
             gen_expression(statement->data.while_lp.while_expr);
             newline_emit_expr("LABEL while_%i", while_counter);
@@ -305,7 +325,8 @@ void gen_statement(statement_struct* statement)
             // SKOC ZPET na navesti 
             newline_emit_expr("JUMP while_%i", while_counter);
             newline_emit_expr("LABEL end_while_%i", while_counter); 
-            break;          
+            break;
+        }          
         default:
         break;   
     }
