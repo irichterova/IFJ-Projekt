@@ -124,8 +124,15 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
     }
 }
 
+/**
+ * @brief Measures the indentation at the beginning of a physical line
+ * @param line_indent Pointer to the variable storing the current indentation level
+ * @param symbol Character read from stdin 
+ * @param tab_at_beginning Pointer to a flag indicating the presence of a tab at the beginning of the physical line
+ */
 void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning) {
-    *line_indent = 0;
+    *line_indent = 0; // indentation measurement starts at 0
+
     while (symbol == ' ' || symbol == '\r' || symbol == '\t') {
         if (symbol == ' ') (*line_indent)++;
         else if (symbol == '\t') *tab_at_beginning = true;
@@ -135,12 +142,20 @@ void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning) 
     if (symbol != EOF) ungetc(symbol, stdin);
 }
 
+/**
+ * @brief Updates the indentation stack
+ * @param line_indent Pointer to the variable storing the current indentation level
+ * @param indent_stack Pointer to the stack storing indentation levels
+ * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
+ * @param symbol Last read character to be returned to stdin
+ * @note A line_indent value of -1 indicates that the line indentation has already been processed 
+ */
 void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol) {
     ungetc(symbol, stdin);
     if (*line_indent > stack_top(indent_stack)) {
         stack_push(indent_stack, *line_indent);
         token->type = TOKEN_INDENT;
-        *line_indent = -1;  // -1: line indentation has been already handled
+        *line_indent = -1;
     }
     else if (*line_indent < stack_top(indent_stack)) {
         stack_pop(indent_stack);
@@ -152,6 +167,17 @@ void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* toke
     }
 }
 
+/**
+ * @brief Handles indentation of a physical line
+ * @param line_indent Pointer to the variable storing the current indentation level
+ * @param indent_stack Pointer to the stack storing indentation levels
+ * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
+ * @param symbol Last read character to be returned to stdin
+ * @param tab_at_beginning Flag indicating the presence of a tab at the beginning of the physical line
+ * @param logical_line_cont Indicates whether the current line is a continuation of a logical line
+ * @return true if the indentation stack was updated and the token needs to be returned; false otherwise
+ * @note A line_indent value of -1 indicates that the line indentation has already been processed 
+ */
 bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, 
     bool tab_at_beginning, bool logical_line_cont) {
         
@@ -190,7 +216,7 @@ token_t get_token (enum eol_rules rule) {
 
     static stack_t indent_stack;
     static bool stack_initialized = false;
-    static int line_indent = -2; // -2: line indentation has not been handled yet
+    static int line_indent = -2; // -2: line indentation has not been processed yet
     static bool tab_at_beginning = false;
     
     while (1) {
