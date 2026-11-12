@@ -82,10 +82,16 @@ typedef struct token {
 } token_t;
 
 /**
+ * @brief Returns the current line number
+ * @return Number of the current line
+ */
+int get_line_number ();
+
+/**
  * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
  * @param rule EOL rule determining the permission for the presence of EOL
  * @return Data structure "token" 
  */
-token_t get_token(enum eol_rules rule);
+token_t get_token (enum eol_rules rule);
 
 #endif
