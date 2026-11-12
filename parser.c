@@ -66,6 +66,15 @@ static void add_param(function_struct *func, char *p_name, value_type p_type) {
     func->param_argc++;
 }
 
+// temporary, PSA will replace
+static expr_struct *parse_expr_temp(void) {
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+    }
+    next_token(EOL_OPTIONAL);
+    return NULL;
+}
+
 /**
  * @brief checks syntax of token type keyword (Int, Double, String, Unit)
  * @param eol applies one of the three rules that tells if eol is required, optional or forbidden
