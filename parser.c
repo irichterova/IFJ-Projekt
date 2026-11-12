@@ -76,6 +76,17 @@ static expr_struct *parse_expr_temp(void) {
 }
 
 /**
+ * @brief checks syntax of statement end, it needs to be semicolon or eol
+ */
+static void parse_statement_end(void) {
+    if (token.type == TOKEN_SEMICOLON) {
+        next_token(EOL_OPTIONAL);
+    } else if (!token.after_eol && token.type != TOKEN_DEDENT) {
+        error_exit(ERR_SYN, 0, "Expected eol or semicolon after statement!");
+    }
+}
+
+/**
  * @brief checks syntax of token type keyword (Int, Double, String, Unit)
  * @param eol applies one of the three rules that tells if eol is required, optional or forbidden
  * @return returns value_type that matches keyword
