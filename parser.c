@@ -216,6 +216,17 @@ static void parse_def_var(void) {
 }
 
 /**
+ * @brief checks syntax of statement return with optional expression
+ */
+static void parse_return(void) {
+    next_token(EOL_OPTIONAL);
+    if (!token.after_eol && token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT) {
+        parse_expr_temp();
+    }
+    parse_statement_end();
+}
+
+/**
  * @brief checks syntax of statement in body
  */
 static void parse_statement(void) {
@@ -224,6 +235,9 @@ static void parse_statement(void) {
         case KEYWORD_VAL:
         case KEYWORD_VAR:
             parse_def_var();
+            break;
+        case KEYWORD_RETURN:
+            parse_return();
             break;
         default:
             // temporary for tests:
