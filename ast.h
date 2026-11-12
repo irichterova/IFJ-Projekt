@@ -72,6 +72,7 @@ typedef struct def_var {
 typedef struct id_assign {
     char *id_name;
     size_t codegen_id;
+    value_type id_type;
     struct expr_struct *assign_expr;
 } id_assign;
 
@@ -142,5 +143,11 @@ typedef struct expr_struct {
     value_type result_type;
     expr_data data;
 } expr_struct;
+
+/**
+ * @brief frees entire AST with all strings
+ * @param program struct with all stored data in AST
+ */
+void free_program(program_struct *program);
 
 #endif
