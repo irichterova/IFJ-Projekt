@@ -193,14 +193,49 @@ static int parse_optional_main(void) {
 }
 
 /**
+ * @brief checks syntax of statement val or var
+ */
+static void parse_def_var(void) {
+    statement_type va_type;
+    if (token.data.keyword == KEYWORD_VAL) {
+        va_type = STMT_VAL;
+    } else {
+        va_type = STMT_VAR;
+    }
+    next_token(EOL_FORBIDDEN);
+    if (token.type == TOKEN_IDENTIFIER) {
+        free(token.data.id);
+        next_token(EOL_FORBIDDEN);
+    } else {
+        error_exit(ERR_SYN, 0, "Expected identifier after val/var!");
+    }
+    parse_optional_type();
+    type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
+    parse_expr_temp();
+    parse_statement_end();
+}
+
+/**
  * @brief checks syntax of statement in body
  */
 static void parse_statement(void) {
-    // temporary for tests:
-    if (token.type == TOKEN_IDENTIFIER) {
-        free(token.data.id);
+    if (token.type == TOKEN_KEYWORD) {
+        switch (token.data.keyword) {
+        case KEYWORD_VAL:
+        case KEYWORD_VAR:
+            parse_def_var();
+            break;
+        default:
+            // temporary for tests:
+            next_token(EOL_REQUIRED);
+        }
+    } else {
+        // temporary for tests:
+        if (token.type == TOKEN_IDENTIFIER) {
+            free(token.data.id);
+        }
+        next_token(EOL_REQUIRED);
     }
-    next_token(EOL_REQUIRED);
 }
 
 /**
