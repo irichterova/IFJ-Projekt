@@ -13,6 +13,7 @@
 static token_t token;
 static void parse_params_next(function_struct *func);
 static void parse_while(void);
+static void parse_if(void);
 
 /**
  * @brief selects next token from scanner
@@ -243,6 +244,9 @@ static void parse_statement(void) {
         case KEYWORD_WHILE:
             parse_while();
             break;
+        case KEYWORD_IF:
+            parse_if();
+            break;
         default:
             // temporary for tests:
             next_token(EOL_REQUIRED);
@@ -274,6 +278,25 @@ static void parse_block(void) {
     parse_statement();
     parse_statement_next();
     type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
+}
+
+/**
+ * @brief checks syntax of else branch of if statement
+ */
+static void parse_else(void) {
+    keyword_t_check(KEYWORD_ELSE, EOL_REQUIRED);
+    parse_block();
+}
+
+/**
+ * @brief checks syntax of statement if
+ */
+static void parse_if(void) {
+    next_token(EOL_FORBIDDEN);
+    parse_expr_temp();
+    keyword_t_check(KEYWORD_THEN, EOL_REQUIRED);
+    parse_block();
+    parse_else();
 }
 
 /**
