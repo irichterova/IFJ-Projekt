@@ -229,6 +229,27 @@ static void parse_return(void) {
 }
 
 /**
+ * @brief checks syntax of statement begginning with id
+ * @param id_token first id that will be given to PSA
+ */
+static void parse_statement_id(token_t id_token) {
+    if (token.type == TOKEN_ASSIGN && !token.after_eol) {
+        free(id_token.data.id);
+        next_token(EOL_FORBIDDEN);
+        parse_expr_temp();
+    } else {
+        free(id_token.data.id);
+        while (token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT &&
+               token.type != TOKEN_EOF && !token.after_eol) {
+            if (token.type == TOKEN_IDENTIFIER) {
+                free(token.data.id);
+            }
+            next_token(EOL_OPTIONAL);
+        }
+    }
+}
+
+/**
  * @brief checks syntax of statement in body
  */
 static void parse_statement(void) {
@@ -248,15 +269,18 @@ static void parse_statement(void) {
             parse_if();
             break;
         default:
-            // temporary for tests:
-            next_token(EOL_REQUIRED);
+            error_exit(ERR_SYN, get_line_number(), "Unexpected keyword!");
         }
     } else {
-        // temporary for tests:
         if (token.type == TOKEN_IDENTIFIER) {
-            free(token.data.id);
+            token_t id_token = token;
+            next_token(EOL_OPTIONAL);
+            parse_statement_id(id_token);
+            parse_statement_end();
+        } else {
+            parse_expr_temp();
+            parse_statement_end();
         }
-        next_token(EOL_REQUIRED);
     }
 }
 
