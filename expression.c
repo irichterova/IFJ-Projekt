@@ -304,7 +304,7 @@ static void reduce(PSA_Stack *stack) {
     // Now it's PSA_STOP < at the top, so we pop it
     pop_item(stack);
 
-    // E -> ( E ): nothing new, reuse
+    // E -> ( E ) Nothing new, reuse
     if (count == 3 && handle[2].item_symbol == PSA_LEFT_P && handle[1].item_symbol == PSA_E && handle[0].item_symbol == PSA_RIGHT_P) {
         Stack_Item new_item = {.item_symbol = PSA_E, .line = handle[2].line, .subtree = handle[1].subtree};
         push_item(stack, new_item);
@@ -318,6 +318,54 @@ static void reduce(PSA_Stack *stack) {
     }
 
     // TODO: Finish gramatic rules
+    // E -> i
+    if (count == 1 && handle[0].item_symbol == PSA_ID) {
+        switch (handle[0].item_token.type) {
+        case TOKEN_IDENTIFIER:
+            node->node_type = EXPR_VARIABLE;
+            node->data.variable.id_name = handle[0].item_token.data.id;
+            node->result_type = TYPE_UNKNOWN; // We don't know yet, will check later
+            break;
+        
+        case TOKEN_INT_LITERAL:
+            node->node_type = EXPR_LIT_INT;
+            node->data.lit_int = handle[0].item_token.data.int_value;
+            node->result_type = TYPE_INT;
+            break;
+
+        case TOKEN_DBL_LITERAL:
+            node->node_type = EXPR_LIT_DOUBLE;
+            node->data.lit_double = handle[0].item_token.data.dbl_value;
+            node->result_type = TYPE_DOUBLE;
+            break;
+
+        case TOKEN_STR_LITERAL:
+            node->node_type = EXPR_LIT_STRING;
+            node->data.lit_string = handle[0].item_token.data.str_value;
+            node->result_type = TYPE_STRING;
+            break;
+
+        // TODO: Wait for updated parser to be merged to main
+        /*
+        case TOKEN_TRUE_LITERAL:
+        case TOKEN_FALSE_LITERAL:
+        */
+        default:
+            error_exit(ERR_SYN, handle[0].line, "Incorrect E -> i expression gramatics!");
+        }
+    }
+
+    // E -> ~E
+    else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_UNARY_MINUS) {
+        
+    }
+
+    // E -> E op E
+    else if (count == 3 && handle[2].item_symbol == PSA_E && handle[0].item_symbol == PSA_E) {
+
+    } else {
+        error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any gramatic rule!");
+    }
 
     // Create a new AST node
     Stack_Item new_item = {.item_symbol = PSA_E, .subtree = node,}; // TODO: Fill in the rest later
