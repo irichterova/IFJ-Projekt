@@ -132,7 +132,7 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
                 return PSA_SUB;
             }
             return PSA_UNARY_MINUS;
-            
+
         default:
             // Any other token (then, do, ',', EOF, etc.) ends the expression
             return PSA_START_END;
@@ -284,6 +284,49 @@ static void free_stack (PSA_Stack *stack) {
 // Stack code above
 
 /**
+ * @brief Reduces handle into a new tree
+ * @param stack Pointer to stack var
+ */
+static void reduce(PSA_Stack *stack) {
+    int count = 0;
+    Stack_Item handle[3]; // We can reduce a maximum of three (3) items, otherwise error
+
+    Stack_Item item_top = top_item(stack);
+    while (item_top.item_symbol != PSA_STOP) {
+        if (count == 3) {
+            error_exit(ERR_SYN, handle[0].line, "Tried to reduce too many items!");
+        }
+        handle[count] = pop_item(stack);
+        count++;
+        // Update top item
+        item_top = top_item(stack);
+    }
+    // Now it's PSA_STOP < at the top, so we pop it
+    pop_item(stack);
+
+    // E -> ( E ): nothing new, reuse
+    if (count == 3 && handle[2].item_symbol == PSA_LEFT_P && handle[1].item_symbol == PSA_E && handle[0].item_symbol == PSA_RIGHT_P) {
+        Stack_Item new_item = {.item_symbol = PSA_E, .line = handle[2].line, .subtree = handle[1].subtree};
+        push_item(stack, new_item);
+        return;
+    }
+
+    // This will we our new subtree
+    expr_struct *node = malloc(sizeof(expr_struct));
+    if (node == NULL) {
+        error_exit(ERR_INTERNAL, handle[0].line, "Failed to allocate memory for a new AST node while reducing!");
+    }
+
+    // TODO: Finish gramatic rules
+
+    // Create a new AST node
+    Stack_Item new_item = {.item_symbol = PSA_E, .subtree = node,}; // TODO: Fill in the rest later
+
+    // Push a new item with a new subtree to stack
+    push_item(stack, new_item);
+}
+
+/**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
  * @param next Where to store the following token
@@ -303,6 +346,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)insert_stop;
     (void)free_stack;
     (void)token2symbol;
+    (void)reduce;
 
     return NULL;
 }
@@ -329,6 +373,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)insert_stop;
     (void)free_stack;
     (void)token2symbol;
+    (void)reduce;
 
     return NULL;
 }
