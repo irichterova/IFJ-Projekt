@@ -199,6 +199,19 @@ static void insert_stop (PSA_Stack *stack) {
 }
 
 /**
+ * @brief Frees the allocated memory
+ * @param stack Pointer to stack var
+ */
+static void free_stack (PSA_Stack *stack) {
+    free(stack->stack_items);
+    stack->stack_items = NULL;
+    stack->capacity = 0;
+    stack->top = 0;
+}
+
+// Stack code above
+
+/**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
  * @param next Where to store the following token
@@ -216,6 +229,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)top_item;
     (void)top_terminal;
     (void)insert_stop;
+    (void)free_stack;
 
     return NULL;
 }
@@ -240,6 +254,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)top_item;
     (void)top_terminal;
     (void)insert_stop;
+    (void)free_stack;
 
     return NULL;
 }
