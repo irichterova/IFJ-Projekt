@@ -91,7 +91,7 @@ static void init_stack (PSA_Stack *stack) {
     stack->stack_items = malloc(sizeof(Stack_Item) * INITIAL_CAPACITY);
     // Failed malloc
     if (stack->stack_items == NULL) {
-        error_exit(ERR_INTERNAL, 0, "Failed to malloc a new PSA Stack");
+        error_exit(ERR_INTERNAL, 0, "Failed to malloc a new PSA Stack in init_stack!");
     }
     stack->capacity = INITIAL_CAPACITY;
     stack->top = 0;
@@ -104,14 +104,14 @@ static void init_stack (PSA_Stack *stack) {
 */
 static void push_item (PSA_Stack *stack, Stack_Item item) {
     // Add an item, expand if full
-    if (stack->top == stack->capacity) {
+    if (stack->top >= stack->capacity) {
         stack->capacity *= 2;
 
         Stack_Item *temp_stack_items = realloc(stack->stack_items, sizeof(Stack_Item) * stack->capacity);
         // Failed realloc
         if (temp_stack_items == NULL) {
             free(stack->stack_items);
-            error_exit(ERR_INTERNAL, 0, "Failed to realloc a new PSA Stack");
+            error_exit(ERR_INTERNAL, 0, "Failed to realloc a new PSA Stack in push_item!");
         }
         stack->stack_items = temp_stack_items;
     }
@@ -163,6 +163,36 @@ static int top_terminal (PSA_Stack *stack) {
 }
 
 /**
+ * @brief Insert < symbol to stack to note Handle scope
+ * @param stack Pointer to stack var
+ */
+static void insert_stop (PSA_Stack *stack) {
+    // Check for space and increase capacity if we need to
+    if (stack->top >= stack->capacity) {
+        stack->capacity *= 2;
+
+        Stack_Item *temp_stack_items = realloc(stack->stack_items, sizeof(Stack_Item) * stack->capacity);
+        // Failed realloc
+        if (temp_stack_items == NULL) {
+            free(stack->stack_items);
+            error_exit(ERR_INTERNAL, 0, "Failed to realloc a new PSA Stack in insert_stop!");
+        }
+        stack->stack_items = temp_stack_items;
+    }
+    // Go over items from the top, if E or < skip, if not insert PSA_STOP
+    for (int i = stack->top - 1; i >= 0; i--) {
+        if (stack->stack_items[i].item_symbol == PSA_E || stack->stack_items[i].item_symbol == PSA_STOP) {
+            stack->stack_items[i + 1] = stack->stack_items[i];
+        } else {
+            stack->stack_items[i + 1].item_symbol = PSA_STOP;
+            stack->stack_items[i + 1].subtree = NULL;
+            break;
+        }
+    }
+    stack->top++;
+}
+
+/**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
  * @param next Where to store the following token
@@ -179,6 +209,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)pop_item;
     (void)top_item;
     (void)top_terminal;
+    (void)insert_stop;
 
     return NULL;
 }
@@ -202,6 +233,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)pop_item;
     (void)top_item;
     (void)top_terminal;
+    (void)insert_stop;
 
     return NULL;
 }
