@@ -144,6 +144,24 @@ static Stack_Item top_item (PSA_Stack *stack) {
     return stack->stack_items[stack->top - 1];
 }
 
+
+/**
+ * @brief Find the top-most terminal
+ * @param stack Pointer to stack var
+ * @return Position of the top-most terminal
+ */
+static int top_terminal (PSA_Stack *stack) {
+    // top - 1 is the first stack item
+    for (int i = stack->top - 1; i >= 0; i--) {
+        if (stack->stack_items[i].item_symbol != PSA_E && stack->stack_items[i].item_symbol != PSA_STOP) {
+            return i;
+        }
+    }
+    // None was found
+    error_exit(ERR_INTERNAL, 0, "Couldn't find a terminal symbol in stack!");
+    return -1;
+}
+
 /**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
@@ -160,6 +178,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)push_item;
     (void)pop_item;
     (void)top_item;
+    (void)top_terminal;
 
     return NULL;
 }
@@ -182,6 +201,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)push_item;
     (void)pop_item;
     (void)top_item;
+    (void)top_terminal;
 
     return NULL;
 }
