@@ -25,8 +25,8 @@ typedef enum {
     PSA_EQUAL,       // ==
     PSA_NOT_EQUAL,   // !=
     PSA_ID,          // i
-    PSA_LEFT_B,      // (
-    PSA_RIGHT_B,     // )
+    PSA_LEFT_P,      // (
+    PSA_RIGHT_P,     // )
     PSA_START_END,   // $
     PSA_CAT,         // ++ [LISTS]
     PSA_NOT,         // !  [BOOLTHEN]
@@ -67,6 +67,79 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
     /* && */ {PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE},
     /* || */ {PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE},
 };
+
+/**
+ * @brief Transforms a token into a corresponding symbol
+ * @param token Token from scanner
+ * @param prev What symbol came before this one
+ * @param depth Depth of the token in the expression
+ * @return Symbol representing the token
+ */
+static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
+    // Eol out of parentheses means end of expression
+    if (token.after_eol && depth == 0) {
+        return PSA_START_END;
+    }
+
+    switch (token.type) {
+        // All of these result in i
+        case TOKEN_IDENTIFIER:
+        case TOKEN_INT_LITERAL:
+        case TOKEN_DBL_LITERAL:
+        case TOKEN_STR_LITERAL:
+        case TOKEN_TRUE_LITERAL:
+        case TOKEN_FALSE_LITERAL:
+            return PSA_ID;
+
+        case TOKEN_OP_ADD:
+            return PSA_ADD;
+        // Not OP_SUB, could be unary
+        case TOKEN_OP_MUL:
+            return PSA_MUL;
+        case TOKEN_OP_DIV:
+            return PSA_DIV;
+        case TOKEN_OP_LT:
+            return PSA_LESS;
+        case TOKEN_OP_LE:
+            return PSA_LESS_EQ;
+        case TOKEN_OP_GT:
+            return PSA_GREATER;
+        case TOKEN_OP_GE:
+            return PSA_GREATER_EQ;
+        case TOKEN_OP_EQ:
+            return PSA_EQUAL;
+        case TOKEN_OP_NEQ:
+            return PSA_NOT_EQUAL;
+
+        case TOKEN_OP_NOT:
+            return PSA_NOT;
+        case TOKEN_OP_AND:
+            return PSA_AND;
+        case TOKEN_OP_OR:
+            return PSA_OR;
+
+        case TOKEN_L_PARENTH:
+            return PSA_LEFT_P;
+        case TOKEN_R_PARENTH:
+            if (depth == 0) {
+                return PSA_START_END; // $
+            }    
+            return PSA_RIGHT_P;
+        
+
+        case TOKEN_OP_SUB:
+            if (prev == PSA_ID || prev == PSA_RIGHT_P) {
+            // Binary -
+                return PSA_SUB;
+            }
+            // Unary - (marked ~)
+            return PSA_UNARY_MINUS;
+            
+
+        default:
+            return PSA_START_END;
+    }
+}
 
 // Stack code below
 
@@ -230,6 +303,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)top_terminal;
     (void)insert_stop;
     (void)free_stack;
+    (void)token2symbol;
 
     return NULL;
 }
@@ -255,6 +329,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)top_terminal;
     (void)insert_stop;
     (void)free_stack;
+    (void)token2symbol;
 
     return NULL;
 }
