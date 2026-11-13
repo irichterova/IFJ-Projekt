@@ -133,6 +133,18 @@ static Stack_Item pop_item (PSA_Stack *stack) {
 }
 
 /**
+ * @brief Read the top item on stack
+ * @param stack Pointer to stack var
+ * @return Item at the top
+ */
+static Stack_Item top_item (PSA_Stack *stack) {
+    if (stack->top == 0) {
+        error_exit(ERR_INTERNAL, 0, "Tried to reach a negative item in stack!");
+    }
+    return stack->stack_items[stack->top - 1];
+}
+
+/**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
  * @param next Where to store the following token
@@ -147,6 +159,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)init_stack;
     (void)push_item;
     (void)pop_item;
+    (void)top_item;
 
     return NULL;
 }
@@ -168,6 +181,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)init_stack;
     (void)push_item;
     (void)pop_item;
+    (void)top_item;
 
     return NULL;
 }
