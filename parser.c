@@ -31,7 +31,7 @@ static void type_t_check(enum token_types t_type, enum eol_rules eol) {
     if (token.type == t_type) {
         next_token(eol);
     } else {
-        error_exit(ERR_SYN, 0, "Type of token doesn't match!");
+        error_exit(ERR_SYN, get_line_number(), "Type of token doesn't match!");
     }
 }
 
@@ -44,7 +44,7 @@ static void keyword_t_check(enum keywords_enum t_keyword, enum eol_rules eol) {
     if (token.type == TOKEN_KEYWORD && token.data.keyword == t_keyword) {
         next_token(eol);
     } else {
-        error_exit(ERR_SYN, 0, "Keyword of token doesn't match!");
+        error_exit(ERR_SYN, get_line_number(), "Keyword of token doesn't match!");
     }
 }
 
@@ -58,7 +58,7 @@ static void add_param(function_struct *func, char *p_name, value_type p_type) {
     params_struct *array_param =
         realloc(func->param_args, sizeof(params_struct) * (func->param_argc + 1));
     if (array_param == NULL) {
-        error_exit(ERR_INTERNAL, 0, "Param allocation goes wrong!");
+        error_exit(ERR_INTERNAL, get_line_number(), "Param allocation goes wrong!");
     }
     func->param_args = array_param;
     func->param_args[func->param_argc].param_name = p_name;
@@ -83,7 +83,7 @@ static void parse_statement_end(void) {
     if (token.type == TOKEN_SEMICOLON) {
         next_token(EOL_OPTIONAL);
     } else if (!token.after_eol && token.type != TOKEN_DEDENT) {
-        error_exit(ERR_SYN, 0, "Expected eol or semicolon after statement!");
+        error_exit(ERR_SYN, get_line_number(), "Expected eol or semicolon after statement!");
     }
 }
 
@@ -108,10 +108,10 @@ static value_type parse_type(enum eol_rules eol) {
             next_token(eol);
             return TYPE_UNIT;
         default:
-            error_exit(ERR_SYN, 0, "Token type doesn't match any type!");
+            error_exit(ERR_SYN, get_line_number(), "Token type doesn't match any type!");
         }
     } else {
-        error_exit(ERR_SYN, 0, "Expected keyword type!");
+        error_exit(ERR_SYN, get_line_number(), "Expected keyword type!");
     }
     return TYPE_UNKNOWN;
 }
@@ -144,7 +144,7 @@ static void parse_params_rest(function_struct *func) {
     } else {
         // Checks trailing comma if there is no identifier after comma
         if (!token.after_eol && token.type == TOKEN_R_PARENTH) {
-            error_exit(ERR_SYN, 0, "After trailing comma has to be end of line!");
+            error_exit(ERR_SYN, get_line_number(), "After trailing comma has to be end of line!");
         }
     }
 }
@@ -187,7 +187,7 @@ static int parse_optional_main(void) {
             next_token(EOL_OPTIONAL); // checks syntax of opt_eol
             return 1;
         } else {
-            error_exit(ERR_SYN, 0, "Identifier doesn't match with string main!");
+            error_exit(ERR_SYN, get_line_number(), "Identifier doesn't match with string main!");
         }
     }
     return 0;
@@ -208,7 +208,7 @@ static void parse_def_var(void) {
         free(token.data.id);
         next_token(EOL_FORBIDDEN);
     } else {
-        error_exit(ERR_SYN, 0, "Expected identifier after val/var!");
+        error_exit(ERR_SYN, get_line_number(), "Expected identifier after val/var!");
     }
     parse_optional_type();
     type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
@@ -308,7 +308,7 @@ static function_struct *parse_func(void) {
     int main_found = parse_optional_main();
     function_struct *func = calloc(1, sizeof(function_struct));
     if (func == NULL) {
-        error_exit(ERR_INTERNAL, 0, "Function allocation goes wrong!");
+        error_exit(ERR_INTERNAL, get_line_number(), "Function allocation goes wrong!");
     }
     func->is_main = main_found;
     keyword_t_check(KEYWORD_DEF, EOL_FORBIDDEN);
@@ -323,7 +323,7 @@ static function_struct *parse_func(void) {
         parse_body();
         return func;
     } else {
-        error_exit(ERR_SYN, 0, "Missing identifier after 'def'!");
+        error_exit(ERR_SYN, get_line_number(), "Missing identifier after 'def'!");
         return NULL;
     }
 }
@@ -352,7 +352,7 @@ static void parse_prolog(void) {
         free(token.data.id);
         next_token(EOL_FORBIDDEN);
     } else {
-        error_exit(ERR_SYN, 0, "Identifier doesn't match with string ifj26!");
+        error_exit(ERR_SYN, get_line_number(), "Identifier doesn't match with string ifj26!");
     }
     type_t_check(TOKEN_PERIOD, EOL_FORBIDDEN);
     type_t_check(TOKEN_OP_MUL, EOL_REQUIRED);
@@ -361,13 +361,13 @@ static void parse_prolog(void) {
 program_struct *parse_program(void) {
     program_struct *program = calloc(1, sizeof(program_struct));
     if (program == NULL) {
-        error_exit(ERR_INTERNAL, 0, "Program allocation goes wrong!");
+        error_exit(ERR_INTERNAL, get_line_number(), "Program allocation goes wrong!");
     }
     next_token(EOL_OPTIONAL);
     parse_prolog();
     program->first_func = parse_func_list();
     if (token.type != TOKEN_EOF) {
-        error_exit(ERR_SYN, 0, "Expected end of file!");
+        error_exit(ERR_SYN, get_line_number(), "Expected end of file!");
     }
     return program;
 }
