@@ -13,6 +13,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 //Global counter for cycles (if, while)
 static int cycle_counter = 0;
 static char *func_name = NULL;
+static value_type func_ret = TYPE_UNKNOWN;
 /*
     @brief  Prints formatted line of IFJ26code without a newline
     @param  *msg_format Format of a printed line
@@ -48,7 +49,7 @@ void emit_expr_str(char *str)
 {   
     for(size_t i = 0; str[i] != '\0'; i++)
     {
-        char c = str[i];
+       unsigned char c = str[i];
         if(c <= 32 || c == 35 || c == 92 || c >= 127)
         {
             emit_expr("\\%03i", c);
@@ -60,9 +61,11 @@ void emit_expr_str(char *str)
     }
 }
 
-int gen_code(program_struct *program_code, FILE *output)
+int gen_code(program_struct *program_code)
 {
     newline_emit_expr(".IFJcode26");
+    newline_emit_expr("DEFVAR GF@$tmp-str1");
+    newline_emit_expr("DEFVAR GF@$tmp-str2");
     newline_emit_expr("CREATEFRAME");
     function_struct *main_func = program_code->first_func;
 
@@ -95,11 +98,6 @@ void emit_defvar(statement_struct *statement)
         {
             case STMT_VAL:
             case STMT_VAR:
-                if(statement->data.var_stmt.init_expr == NULL)
-                {
-                    newline_emit_expr("PUSHS nil@nil");
-                    break;
-                }
                 newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
                 break;
             case STMT_IF:
@@ -284,7 +282,7 @@ void gen_statement(statement_struct* statement)
             statement_struct *then_stmts = statement->data.if_stmt.then_stmt;
             while(then_stmts != NULL)
             {
-                gen_statement(then_stmts);
+                gen_statement(then_stmts); 
                 then_stmts = then_stmts->next;
             }
             newline_emit_expr("JUMP if_end_%i", if_counter);
@@ -299,13 +297,13 @@ void gen_statement(statement_struct* statement)
             break;
         }
         case STMT_RETURN:
+            gen_expression(statement->data.ret_stmt);
             if(statement->data.ret_stmt != NULL)
             {
-                if(statement->data.ret_stmt->result_type == TYPE_DOUBLE)
+                if(statement->data.ret_stmt->result_type == TYPE_INT && func_ret == TYPE_DOUBLE)
                 {
                     newline_emit_expr("INT2FLOATS");
                 }
-                gen_expression(statement->data.ret_stmt);
             }
             else 
             {
@@ -317,12 +315,14 @@ void gen_statement(statement_struct* statement)
         {
             int while_counter = 0;
             while_counter = ++cycle_counter;
-            gen_expression(statement->data.while_lp.while_expr);
             newline_emit_expr("LABEL while_%i", while_counter);
+            gen_expression(statement->data.while_lp.while_expr);
             newline_emit_expr("PUSHS bool@false");
             newline_emit_expr("JUMPIFEQS end_while_%i", while_counter);
-            gen_statement(statement->data.while_lp.while_body);
-            // SKOC ZPET na navesti 
+            for(statement_struct *s = statement->data.while_lp.while_body; s != NULL; s = s->next)
+            {
+                gen_statement(s);
+            } 
             newline_emit_expr("JUMP while_%i", while_counter);
             newline_emit_expr("LABEL end_while_%i", while_counter); 
             break;
@@ -335,7 +335,7 @@ void gen_statement(statement_struct* statement)
 void gen_function(function_struct *function)
 {
     func_name = function->func_name;
-
+    func_ret = function->result_ret_type;
     newline_emit_expr("LABEL fn_%s", func_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$trash");
@@ -352,11 +352,29 @@ void gen_function(function_struct *function)
     statement_struct *stmt = function->stmt_body;
     while(stmt != NULL)
     {
-        gen_statement(stmt);
+        if(stmt->next == NULL)
+        {
+            if(stmt->stmt_type == STMT_EXPR)
+            {
+                gen_expression(stmt->data.expr_stmt);
+                if(func_ret == TYPE_UNIT && stmt->data.expr_stmt->result_type != TYPE_UNIT)
+                {
+                    newline_emit_expr("POPS LF@$trash");
+                }
+            }
+        }
+        else
+        {
+            gen_statement(stmt);
+        }
         stmt = stmt->next;
     }
-    
-    newline_emit_expr("PUSHS nil@nil");
+
+    if(function->result_ret_type == TYPE_UNIT)
+    {
+        newline_emit_expr("PUSHS nil@nil");
+    }
+
     newline_emit_expr("LABEL end_%s", func_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
