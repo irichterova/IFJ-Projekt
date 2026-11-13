@@ -18,7 +18,9 @@ typedef enum {
     EXPR_VARIABLE,
     EXPR_UNA_OP,
     EXPR_BIN_OP,
-    EXPR_CALL_FUNC
+    EXPR_CALL_FUNC,
+    EXPR_LIT_TRUE,
+    EXPR_LIT_FALSE
 } expr_node_type;
 
 typedef enum {
@@ -32,7 +34,10 @@ typedef enum {
     OP_EQUAL_LESS,
     OP_EQUAL_GREATER,
     OP_EQUAL,
-    OP_NOTEQUAL
+    OP_NOTEQUAL,
+    OP_NOT,
+    OP_AND,
+    OP_OR
 } operator_type;
 
 typedef enum {
