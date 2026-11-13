@@ -12,6 +12,7 @@
 
 static token_t token;
 static void parse_params_next(function_struct *func);
+static void parse_while(void);
 
 /**
  * @brief selects next token from scanner
@@ -239,6 +240,9 @@ static void parse_statement(void) {
         case KEYWORD_RETURN:
             parse_return();
             break;
+        case KEYWORD_WHILE:
+            parse_while();
+            break;
         default:
             // temporary for tests:
             next_token(EOL_REQUIRED);
@@ -260,6 +264,26 @@ static void parse_statement_next(void) {
         parse_statement();
         parse_statement_next();
     }
+}
+
+/**
+ * @brief checks syntax of indented block in statements body, while, if and else
+ */
+static void parse_block(void) {
+    type_t_check(TOKEN_INDENT, EOL_OPTIONAL);
+    parse_statement();
+    parse_statement_next();
+    type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
+}
+
+/**
+ * @brief checks syntax of statement while loop
+ */
+static void parse_while(void) {
+    next_token(EOL_FORBIDDEN);
+    parse_expr_temp();
+    keyword_t_check(KEYWORD_DO, EOL_REQUIRED);
+    parse_block();
 }
 
 /**
