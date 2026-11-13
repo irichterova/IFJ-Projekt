@@ -290,13 +290,8 @@ static void parse_while(void) {
  * @brief checks syntax of body in function
  */
 static void parse_body(void) {
-    if (token.type == TOKEN_INDENT) {
-        next_token(EOL_OPTIONAL);
-        parse_statement();
-        parse_statement_next();
-        type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
-    } else if (token.after_eol) {
-        error_exit(ERR_SYN, 0, "Expected indent after assign token!");
+    if (token.after_eol) {
+        parse_block();
     } else {
         if (token.type == TOKEN_IDENTIFIER) {
             free(token.data.id);
