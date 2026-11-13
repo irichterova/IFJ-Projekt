@@ -72,7 +72,7 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
  * @brief Transforms a token into a corresponding symbol
  * @param token Token from scanner
  * @param prev What symbol came before this one
- * @param depth Depth of the token in the expression
+ * @param depth Number of currently open parentheses
  * @return Symbol representing the token
  */
 static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
@@ -93,7 +93,6 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
 
         case TOKEN_OP_ADD:
             return PSA_ADD;
-        // Not OP_SUB, could be unary
         case TOKEN_OP_MUL:
             return PSA_MUL;
         case TOKEN_OP_DIV:
@@ -123,20 +122,19 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
         case TOKEN_R_PARENTH:
             if (depth == 0) {
                 return PSA_START_END; // $
-            }    
+            }
             return PSA_RIGHT_P;
-        
 
         case TOKEN_OP_SUB:
+            // Scanner doesn't distinguish unary and binary minus
+            // So we do it ourselves
             if (prev == PSA_ID || prev == PSA_RIGHT_P) {
-            // Binary -
                 return PSA_SUB;
             }
-            // Unary - (marked ~)
             return PSA_UNARY_MINUS;
             
-
         default:
+            // Any other token (then, do, ',', EOF, etc.) ends the expression
             return PSA_START_END;
     }
 }
@@ -147,6 +145,7 @@ typedef struct psa_stack_item_t {
     psa_symbol item_symbol; // Terminal, PSA_E or PSA_STOP
     token_t item_token;     // For terminals only
     expr_struct* subtree;   // Pointer to subtree created by reduction
+    int line;               // Source line: terminal = line of its token, E = line set in reduction
 } Stack_Item;
 
 typedef struct psa_stack_t {
