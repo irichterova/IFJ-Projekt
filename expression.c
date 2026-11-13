@@ -167,6 +167,10 @@ static int top_terminal (PSA_Stack *stack) {
  * @param stack Pointer to stack var
  */
 static void insert_stop (PSA_Stack *stack) {
+    if (stack->top == 0) {
+        error_exit(ERR_INTERNAL, 0, "Tried to insert stop on an empty stack in insert_stop!");
+    }
+
     // Check for space and increase capacity if we need to
     if (stack->top >= stack->capacity) {
         stack->capacity *= 2;
@@ -184,9 +188,11 @@ static void insert_stop (PSA_Stack *stack) {
         if (stack->stack_items[i].item_symbol == PSA_E || stack->stack_items[i].item_symbol == PSA_STOP) {
             stack->stack_items[i + 1] = stack->stack_items[i];
         } else {
-            stack->stack_items[i + 1].item_symbol = PSA_STOP;
-            stack->stack_items[i + 1].subtree = NULL;
+            stack->stack_items[i + 1] = (Stack_Item){ .item_symbol = PSA_STOP, .subtree = NULL };
             break;
+        }
+        if (i == 0) {
+            error_exit(ERR_INTERNAL, 0 , "Failed to insert stop in insert_stop!");
         }
     }
     stack->top++;
