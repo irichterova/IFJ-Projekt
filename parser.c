@@ -377,15 +377,18 @@ static statement_struct *parse_while(void) {
 
 /**
  * @brief checks syntax of body in function
+ * @return statement of body node
  */
-static void parse_body(void) {
+static statement_struct *parse_body(void) {
     if (token.after_eol) {
-        parse_block();
+        return parse_block();
     } else {
-        if (token.type == TOKEN_IDENTIFIER) {
-            free(token.data.id);
+        statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
+        stmt->data.expr_stmt = parse_expr_temp();
+        if (!token.after_eol && token.type != TOKEN_EOF) {
+            error_exit(ERR_SYN, get_line_number(), "Expected eol after function body!");
         }
-        next_token(EOL_REQUIRED);
+        return stmt;
     }
 }
 
@@ -394,11 +397,12 @@ static void parse_body(void) {
  * @return function_struct func with is_main, func_name and declared_ret_type
  */
 static function_struct *parse_func(void) {
-    int main_found = parse_optional_main();
     function_struct *func = calloc(1, sizeof(function_struct));
     if (func == NULL) {
         error_exit(ERR_INTERNAL, get_line_number(), "Function allocation goes wrong!");
     }
+    func->line = get_line_number();
+    int main_found = parse_optional_main();
     func->is_main = main_found;
     keyword_t_check(KEYWORD_DEF, EOL_FORBIDDEN);
     if (token.type == TOKEN_IDENTIFIER) {
@@ -409,7 +413,7 @@ static function_struct *parse_func(void) {
         type_t_check(TOKEN_R_PARENTH, EOL_FORBIDDEN);
         func->declared_ret_type = parse_optional_type();
         type_t_check(TOKEN_ASSIGN, EOL_OPTIONAL);
-        parse_body();
+        func->stmt_body = parse_body();
         return func;
     } else {
         error_exit(ERR_SYN, get_line_number(), "Missing identifier after 'def'!");
