@@ -88,6 +88,8 @@ static statement_struct *create_stmt(int line, statement_type type) {
 static expr_struct *parse_expr_temp(void) {
     if (token.type == TOKEN_IDENTIFIER) {
         free(token.data.id);
+    } else if (token.type == TOKEN_STR_LITERAL) {
+        free(token.data.str_value);
     }
     next_token(EOL_OPTIONAL);
     return NULL;
@@ -270,6 +272,8 @@ static statement_struct *parse_statement_id(token_t id_token, int line) {
                token.type != TOKEN_EOF && !token.after_eol) {
             if (token.type == TOKEN_IDENTIFIER) {
                 free(token.data.id);
+            } else if (token.type == TOKEN_STR_LITERAL) {
+                free(token.data.str_value);
             }
             next_token(EOL_OPTIONAL);
         }
