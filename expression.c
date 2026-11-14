@@ -284,6 +284,43 @@ static void free_stack (PSA_Stack *stack) {
 // Stack code above
 
 /**
+ * @brief Function to transform psa symbol enum names into actual operation enum names
+ * @param symbol Symbol to check
+ * @param line Line it's on
+ * @return Corresponding operator from ast.h
+ */
+static operator_type symbol2operator(psa_symbol symbol, int line) {
+    switch (symbol)
+    {
+    case PSA_ADD:
+        return OP_PLUS;
+    case PSA_SUB:
+        return OP_BIN_MINUS;
+    case PSA_MUL:
+        return OP_MULTIPLICATION;
+    case PSA_DIV:
+        return OP_DIVISION;
+    case PSA_LESS:
+        return OP_LESS;
+    case PSA_LESS_EQ:
+        return OP_EQUAL_LESS;
+    case PSA_GREATER:
+        return OP_GREATER;
+    case PSA_GREATER_EQ:
+        return OP_EQUAL_GREATER;
+    case PSA_EQUAL:
+        return OP_EQUAL;
+    case PSA_NOT_EQUAL:
+        return OP_NOTEQUAL;
+    default:
+        // Default should only run when the middle op isn't a bin op like E ( E
+        error_exit(ERR_SYN, line, "Could not transform symbol to operator!");
+        return OP_PLUS; // Never reached only for complier
+    }
+}
+
+
+/**
  * @brief Reduces handle into a new tree
  * @param stack Pointer to stack var
  */
@@ -399,6 +436,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)free_stack;
     (void)token2symbol;
     (void)reduce;
+    (void)symbol2operator;
 
     return NULL;
 }
@@ -426,6 +464,7 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     (void)free_stack;
     (void)token2symbol;
     (void)reduce;
+    (void)symbol2operator;
 
     return NULL;
 }
