@@ -354,9 +354,12 @@ static void reduce(PSA_Stack *stack) {
         error_exit(ERR_INTERNAL, handle[0].line, "Failed to allocate memory for a new AST node while reducing!");
     }
 
-    // TODO: Finish gramatic rules
+    int line = 0;
+
     // E -> i
     if (count == 1 && handle[0].item_symbol == PSA_ID) {
+        line = handle[0].line;
+
         switch (handle[0].item_token.type) {
         case TOKEN_IDENTIFIER:
             node->node_type = EXPR_VARIABLE;
@@ -394,6 +397,8 @@ static void reduce(PSA_Stack *stack) {
 
     // E -> ~E
     else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_UNARY_MINUS) {
+        line = handle[1].line;
+
         // TODO: Type check (-string not allowed)
         node->node_type = EXPR_UNA_OP;
         node->data.unary_op.op_type = OP_UNA_MINUS;
@@ -403,13 +408,21 @@ static void reduce(PSA_Stack *stack) {
 
     // E -> E op E
     else if (count == 3 && handle[2].item_symbol == PSA_E && handle[0].item_symbol == PSA_E) {
+        line = handle[1].line;
 
-    } else {
+        node->node_type = EXPR_BIN_OP;
+        node->data.binary_op.op_type = symbol2operator(handle[1].item_symbol, handle[1].line);
+        node->data.binary_op.left_operand = handle[2].subtree;
+        node->data.binary_op.right_operand = handle[0].subtree;
+        node->result_type = TYPE_UNKNOWN; // TODO: check type
+    }
+    
+    else {
         error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any gramatic rule!");
     }
 
     // Create a new AST node
-    Stack_Item new_item = {.item_symbol = PSA_E, .subtree = node,}; // TODO: Fill in the rest later
+    Stack_Item new_item = {.item_symbol = PSA_E, .line = line, .subtree = node};
 
     // Push a new item with a new subtree to stack
     push_item(stack, new_item);
