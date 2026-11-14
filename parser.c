@@ -251,15 +251,20 @@ static statement_struct *parse_return(void) {
 }
 
 /**
- * @brief checks syntax of statement begginning with id
+ * @brief checks syntax of statement beginning with id
  * @param id_token first id that will be given to PSA
+ * @param line line number where statement starts
+ * @return statement node id
  */
-static void parse_statement_id(token_t id_token) {
+static statement_struct *parse_statement_id(token_t id_token, int line) {
+    statement_struct *stmt;
     if (token.type == TOKEN_ASSIGN && !token.after_eol) {
-        free(id_token.data.id);
+        stmt = create_stmt(line, STMT_ASSIGN);
+        stmt->data.id_stmt.id_name = id_token.data.id;
         next_token(EOL_FORBIDDEN);
-        parse_expr_temp();
+        stmt->data.id_stmt.assign_expr = parse_expr_temp();
     } else {
+        stmt = create_stmt(line, STMT_EXPR);
         free(id_token.data.id);
         while (token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT &&
                token.type != TOKEN_EOF && !token.after_eol) {
@@ -269,6 +274,7 @@ static void parse_statement_id(token_t id_token) {
             next_token(EOL_OPTIONAL);
         }
     }
+    return stmt;
 }
 
 /**
@@ -296,8 +302,9 @@ static void parse_statement(void) {
     } else {
         if (token.type == TOKEN_IDENTIFIER) {
             token_t id_token = token;
+            int line = get_line_number();
             next_token(EOL_OPTIONAL);
-            parse_statement_id(id_token);
+            parse_statement_id(id_token, line);
             parse_statement_end();
         } else {
             parse_expr_temp();
