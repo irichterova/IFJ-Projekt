@@ -12,8 +12,8 @@
 
 static token_t token;
 static void parse_params_next(function_struct *func);
-static void parse_while(void);
-static void parse_if(void);
+static statement_struct *parse_while(void);
+static statement_struct *parse_if(void);
 
 /**
  * @brief selects next token from scanner
@@ -279,23 +279,20 @@ static statement_struct *parse_statement_id(token_t id_token, int line) {
 
 /**
  * @brief checks syntax of statement in body
+ * @return statement node
  */
-static void parse_statement(void) {
+static statement_struct *parse_statement(void) {
     if (token.type == TOKEN_KEYWORD) {
         switch (token.data.keyword) {
         case KEYWORD_VAL:
         case KEYWORD_VAR:
-            parse_def_var();
-            break;
+            return parse_def_var();
         case KEYWORD_RETURN:
-            parse_return();
-            break;
+            return parse_return();
         case KEYWORD_WHILE:
-            parse_while();
-            break;
+            return parse_while();
         case KEYWORD_IF:
-            parse_if();
-            break;
+            return parse_if();
         default:
             error_exit(ERR_SYN, get_line_number(), "Unexpected keyword!");
         }
@@ -304,62 +301,78 @@ static void parse_statement(void) {
             token_t id_token = token;
             int line = get_line_number();
             next_token(EOL_OPTIONAL);
-            parse_statement_id(id_token, line);
+            statement_struct *stmt = parse_statement_id(id_token, line);
             parse_statement_end();
+            return stmt;
         } else {
-            parse_expr_temp();
+            statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
+            stmt->data.expr_stmt = parse_expr_temp();
             parse_statement_end();
+            return stmt;
         }
     }
+    return NULL;
 }
 
 /**
  * @brief checks syntax of remaining statements until dedent
+ * @return rest of statement node, NULL if none
  */
-static void parse_statement_next(void) {
+static statement_struct *parse_statement_next(void) {
     if (token.type != TOKEN_DEDENT) {
-        parse_statement();
-        parse_statement_next();
+        statement_struct *stmt = parse_statement();
+        stmt->next = parse_statement_next();
+        return stmt;
     }
+    return NULL;
 }
 
 /**
  * @brief checks syntax of indented block in statements body, while, if and else
+ * @return first statement of block
  */
-static void parse_block(void) {
+static statement_struct *parse_block(void) {
     type_t_check(TOKEN_INDENT, EOL_OPTIONAL);
-    parse_statement();
-    parse_statement_next();
+    statement_struct *stmt = parse_statement();
+    stmt->next = parse_statement_next();
     type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
+    return stmt;
 }
 
 /**
  * @brief checks syntax of else branch of if statement
+ * @return block of else statement
  */
-static void parse_else(void) {
+static statement_struct *parse_else(void) {
     keyword_t_check(KEYWORD_ELSE, EOL_REQUIRED);
-    parse_block();
+    return parse_block();
 }
 
 /**
  * @brief checks syntax of statement if
+ * @return statement node of if statement
  */
-static void parse_if(void) {
+static statement_struct *parse_if(void) {
+    statement_struct *stmt = create_stmt(get_line_number(), STMT_IF);
     next_token(EOL_FORBIDDEN);
-    parse_expr_temp();
+    stmt->data.if_stmt.if_expr = parse_expr_temp();
     keyword_t_check(KEYWORD_THEN, EOL_REQUIRED);
-    parse_block();
-    parse_else();
+    stmt->data.if_stmt.then_stmt = parse_block();
+    stmt->data.if_stmt.else_stmt = parse_else();
+    return stmt;
 }
 
 /**
  * @brief checks syntax of statement while loop
+ * @return statement node of while statement
  */
-static void parse_while(void) {
+static statement_struct *parse_while(void) {
+    statement_struct *stmt = create_stmt(get_line_number(), STMT_WHILE);
     next_token(EOL_FORBIDDEN);
-    parse_expr_temp();
+    stmt->data.while_lp.while_expr = parse_expr_temp();
     keyword_t_check(KEYWORD_DO, EOL_REQUIRED);
-    parse_block();
+    stmt->data.while_lp.while_body = parse_block();
+    return stmt;
 }
 
 /**
