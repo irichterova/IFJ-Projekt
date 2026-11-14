@@ -10,10 +10,30 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include <stdio.h>
 #include <stdarg.h>
 
-//Global counter for cycles (if, while)
+/* Global counter for cycles (if, while) */
 static int cycle_counter = 0;
 static char *func_name = NULL;
 static value_type func_ret = TYPE_UNKNOWN;
+static value_type var1_type = TYPE_UNKNOWN;
+static value_type var2_type = TYPE_UNKNOWN;
+
+/* INT2FLOATS conversion */
+void int2float(value_type var1_type, value_type var2_type);
+
+/*  Built in functions */
+void print_fun();
+void read_line();
+void read_int();
+void read_double();
+void to_str();
+void to_int();
+void str_len();
+void sub_str();
+void ord();
+void chr();
+
+void gen_builtin();
+
 /**
  * @brief  Prints formatted line of IFJ26code without a newline
  * @param  *msg_format Format of a printed line
@@ -58,6 +78,14 @@ void emit_expr_str(char *str)
         {
             emit_expr("%c", c);
         }
+    }
+}
+
+void int2float(value_type var1_type, value_type var2_type)
+{
+    if(var1_type == TYPE_INT && var2_type == TYPE_DOUBLE)
+    {
+        newline_emit_expr("INT2FLOATS");
     }
 }
 /** 
@@ -332,9 +360,9 @@ void gen_statement(statement_struct* statement)
             break;
         }
         case STMT_RETURN:
-            gen_expression(statement->data.ret_stmt);
             if(statement->data.ret_stmt != NULL)
             {
+                gen_expression(statement->data.ret_stmt);
                 if(statement->data.ret_stmt->result_type == TYPE_INT && func_ret == TYPE_DOUBLE)
                 {
                     newline_emit_expr("INT2FLOATS");
@@ -439,3 +467,4 @@ void gen_function(function_struct *function)
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+
