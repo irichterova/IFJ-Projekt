@@ -68,6 +68,22 @@ static void add_param(function_struct *func, char *p_name, value_type p_type) {
     func->param_argc++;
 }
 
+/**
+ * @brief allocates statement node by statement type
+ * @param line line number where statement starts
+ * @param type type of statement from enum
+ * @return allocated statement_struct
+ */
+static statement_struct *create_stmt(int line, statement_type type) {
+    statement_struct *stmt = calloc(1, sizeof(statement_struct));
+    if (stmt == NULL) {
+        error_exit(ERR_INTERNAL, line, "Memory allocation failed!");
+    }
+    stmt->line = line;
+    stmt->stmt_type = type;
+    return stmt;
+}
+
 // temporary, PSA will replace
 static expr_struct *parse_expr_temp(void) {
     if (token.type == TOKEN_IDENTIFIER) {
@@ -196,36 +212,42 @@ static int parse_optional_main(void) {
 
 /**
  * @brief checks syntax of statement val or var
+ * @return statement node var/val
  */
-static void parse_def_var(void) {
+static statement_struct *parse_def_var(void) {
     statement_type va_type;
     if (token.data.keyword == KEYWORD_VAL) {
         va_type = STMT_VAL;
     } else {
         va_type = STMT_VAR;
     }
+    statement_struct *stmt = create_stmt(get_line_number(), va_type);
     next_token(EOL_FORBIDDEN);
     if (token.type == TOKEN_IDENTIFIER) {
-        free(token.data.id);
+        stmt->data.var_stmt.id_name = token.data.id;
         next_token(EOL_FORBIDDEN);
     } else {
         error_exit(ERR_SYN, get_line_number(), "Expected identifier after val/var!");
     }
-    parse_optional_type();
+    stmt->data.var_stmt.declared_type = parse_optional_type();
     type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
-    parse_expr_temp();
+    stmt->data.var_stmt.init_expr = parse_expr_temp();
     parse_statement_end();
+    return stmt;
 }
 
 /**
  * @brief checks syntax of statement return with optional expression
+ * @return statement node return
  */
-static void parse_return(void) {
+static statement_struct *parse_return(void) {
+    statement_struct *stmt = create_stmt(get_line_number(), STMT_RETURN);
     next_token(EOL_OPTIONAL);
     if (!token.after_eol && token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT) {
-        parse_expr_temp();
+        stmt->data.ret_stmt = parse_expr_temp();
     }
     parse_statement_end();
+    return stmt;
 }
 
 /**
