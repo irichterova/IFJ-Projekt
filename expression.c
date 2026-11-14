@@ -290,8 +290,11 @@ static void free_stack (PSA_Stack *stack) {
  * @return Corresponding operator from ast.h
  */
 static operator_type symbol2operator(psa_symbol symbol, int line) {
-    switch (symbol)
-    {
+    switch (symbol) {
+    case PSA_AND:
+        return OP_AND;
+    case PSA_OR:
+        return OP_OR;
     case PSA_ADD:
         return OP_PLUS;
     case PSA_SUB:
@@ -318,7 +321,6 @@ static operator_type symbol2operator(psa_symbol symbol, int line) {
         return OP_PLUS; // Never reached only for complier
     }
 }
-
 
 /**
  * @brief Reduces handle into a new tree
@@ -384,12 +386,17 @@ static void reduce(PSA_Stack *stack) {
             node->data.lit_string = handle[0].item_token.data.str_value;
             node->result_type = TYPE_STRING;
             break;
-
-        // TODO: Wait for updated parser to be merged to main
-        /*
+        
         case TOKEN_TRUE_LITERAL:
+            node->node_type = EXPR_LIT_TRUE;
+            node->result_type = TYPE_BOOL;
+            break;
+
         case TOKEN_FALSE_LITERAL:
-        */
+            node->node_type = EXPR_LIT_FALSE;
+            node->result_type = TYPE_BOOL;
+            break;
+
         default:
             error_exit(ERR_SYN, handle[0].line, "Incorrect E -> i expression gramatics!");
         }
@@ -406,6 +413,17 @@ static void reduce(PSA_Stack *stack) {
         node->result_type = handle[0].subtree->result_type;
     }
 
+    // E -> !E
+    else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_NOT) {
+        line = handle[1].line;
+
+        // TODO: Type check (!string or !int/double not allowed)
+        node->node_type = EXPR_UNA_OP;
+        node->data.unary_op.op_type = OP_NOT;
+        node->data.unary_op.operand = handle[0].subtree;
+        node->result_type = TYPE_BOOL;
+    }
+
     // E -> E op E
     else if (count == 3 && handle[2].item_symbol == PSA_E && handle[0].item_symbol == PSA_E) {
         line = handle[1].line;
@@ -420,6 +438,9 @@ static void reduce(PSA_Stack *stack) {
     else {
         error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any gramatic rule!");
     }
+
+    // Updated to store line
+    node->line = line;
 
     // Create a new AST node
     Stack_Item new_item = {.item_symbol = PSA_E, .line = line, .subtree = node};
@@ -450,6 +471,8 @@ expr_struct *parse_expr(token_t first, token_t *next) {
     (void)token2symbol;
     (void)reduce;
     (void)symbol2operator;
+
+
 
     return NULL;
 }
