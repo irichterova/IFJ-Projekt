@@ -456,25 +456,77 @@ static void reduce(PSA_Stack *stack) {
  * @return Pointer to the root of the expression tree
  */
 expr_struct *parse_expr(token_t first, token_t *next) {
-    // Field of voided things
-    // TODO: Remove when used
-    (void)first;
-    (void)next;
-    (void)precedence_table;
-    (void)init_stack;
-    (void)push_item;
-    (void)pop_item;
-    (void)top_item;
-    (void)top_terminal;
-    (void)insert_stop;
-    (void)free_stack;
-    (void)token2symbol;
-    (void)reduce;
-    (void)symbol2operator;
+    // First we init stack and push first $
 
+    PSA_Stack stack;
+    init_stack(&stack);
 
+    Stack_Item start_item = {.item_symbol = PSA_START_END};
+    push_item(&stack, start_item);
 
-    return NULL;
+    token_t token = first;              // Current working token
+    psa_symbol prev = PSA_START_END;    // Previous symbol
+    int depth = 0;                      // Tracks the number open parentheses
+    int line = get_line_number();       
+
+    psa_symbol sym = token2symbol(token, prev, depth);
+
+    // Main loop
+    while(1) {
+        int t = top_terminal(&stack);
+        psa_symbol top_sym = stack.stack_items[t].item_symbol;
+
+        // End condition [$, $]
+        if (top_sym == PSA_START_END && sym == PSA_START_END) {
+            break;
+        }
+
+        Stack_Item item;
+        switch (precedence_table[top_sym][sym]) {
+        case PSA_REL_SHIFT:
+            insert_stop(&stack);
+            /* Fallthrough */
+        case PSA_REL_PUSH:
+            item = (Stack_Item){.item_symbol = sym, .item_token = token, .line = line};
+            push_item(&stack, item);
+
+            // Check if we change context depth
+            if (sym == PSA_LEFT_P) {
+                depth++;
+            } else if (sym == PSA_RIGHT_P) {
+                depth--;
+            }
+            // Save current symbol and get a new token and convert it
+            prev = sym;
+            token = get_token(EOL_OPTIONAL);
+            line = get_line_number();
+            sym = token2symbol(token, prev, depth);
+            break;
+
+        case PSA_REL_REDUCE:
+            reduce(&stack);
+            break;
+        case PSA_REL_ERROR:
+            error_exit(ERR_SYN, line, "Incorrect expression syntax!");
+            break;
+        
+        default:
+            error_exit(ERR_SYN, line, "Relation somehow not in precedence table?");
+            break;
+        }
+    }
+
+    // Save the tree
+    Stack_Item final_item = pop_item(&stack);
+    if (final_item.item_symbol != PSA_E) {
+        error_exit(ERR_SYN, line, "Incorrect expression structure!");
+    }
+
+    expr_struct* root = final_item.subtree;
+
+    *next = token;
+    free_stack(&stack);
+    return root;
 }
 
 /**
