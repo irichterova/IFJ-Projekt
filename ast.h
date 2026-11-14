@@ -18,7 +18,9 @@ typedef enum {
     EXPR_VARIABLE,
     EXPR_UNA_OP,
     EXPR_BIN_OP,
-    EXPR_CALL_FUNC
+    EXPR_CALL_FUNC,
+    EXPR_LIT_TRUE,
+    EXPR_LIT_FALSE
 } expr_node_type;
 
 typedef enum {
@@ -32,7 +34,10 @@ typedef enum {
     OP_EQUAL_LESS,
     OP_EQUAL_GREATER,
     OP_EQUAL,
-    OP_NOTEQUAL
+    OP_NOTEQUAL,
+    OP_NOT,
+    OP_AND,
+    OP_OR
 } operator_type;
 
 typedef enum {
@@ -97,6 +102,7 @@ typedef union {
 } statement_data;
 
 typedef struct statement_struct {
+    int line;
     statement_type stmt_type;
     struct statement_struct *next;
     statement_data data;
@@ -110,6 +116,7 @@ typedef struct params_struct {
 
 typedef struct function_struct {
     char *func_name;
+    int line;
     struct params_struct *param_args;
     int param_argc;
     value_type result_ret_type;
@@ -139,6 +146,7 @@ typedef union {
 } expr_data;
 
 typedef struct expr_struct {
+    int line;
     expr_node_type node_type;
     value_type result_type;
     expr_data data;
