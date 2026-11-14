@@ -11,7 +11,7 @@
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
 
-// Symbols defining the table
+// Symbols defining the table, order must match rows/columns of precedence_table
 typedef enum {
     PSA_UNARY_MINUS, // ~
     PSA_MUL,         // *
@@ -76,7 +76,7 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
  * @return Symbol representing the token
  */
 static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
-    // Eol out of parentheses means end of expression
+    // EOL outside parentheses means end of expression
     if (token.after_eol && depth == 0) {
         return PSA_START_END;
     }
@@ -149,15 +149,15 @@ typedef struct psa_stack_item_t {
 } Stack_Item;
 
 typedef struct psa_stack_t {
-    Stack_Item* stack_items; // Field of malloc'd items
-    int top;                 // Current number of items in the stack, plus points at the last one top-1
+    Stack_Item* stack_items; // Array of malloc'd items
+    int top;                 // Item count, top item is at top-1
     int capacity;            // Maximum capacity of the stack
 } PSA_Stack;
 
 /**
  * @brief Create a new stack
  * @param stack Pointer to stack variable
-*/
+ */
 static void init_stack (PSA_Stack *stack) {
     // Init a new stack
     stack->stack_items = malloc(sizeof(Stack_Item) * INITIAL_CAPACITY);
@@ -173,7 +173,7 @@ static void init_stack (PSA_Stack *stack) {
  * @brief Push an item to the top of the stack
  * @param stack Stack to push into
  * @param item Item to put at the top
-*/
+ */
 static void push_item (PSA_Stack *stack, Stack_Item item) {
     // Add an item, expand if full
     if (stack->top >= stack->capacity) {
@@ -206,24 +206,23 @@ static Stack_Item pop_item (PSA_Stack *stack) {
 
 /**
  * @brief Read the top item on stack
- * @param stack Pointer to stack var
+ * @param stack Pointer to stack variable
  * @return Item at the top
  */
 static Stack_Item top_item (PSA_Stack *stack) {
     if (stack->top == 0) {
-        error_exit(ERR_INTERNAL, 0, "Tried to reach a negative item in stack!");
+        error_exit(ERR_INTERNAL, 0, "Tried to read top of an empty stack!");
     }
     return stack->stack_items[stack->top - 1];
 }
 
-
 /**
  * @brief Find the top-most terminal
- * @param stack Pointer to stack var
+ * @param stack Pointer to stack variable
  * @return Position of the top-most terminal
  */
 static int top_terminal (PSA_Stack *stack) {
-    // top - 1 is the first stack item
+    // top - 1 is the top-most stack item
     for (int i = stack->top - 1; i >= 0; i--) {
         if (stack->stack_items[i].item_symbol != PSA_E && stack->stack_items[i].item_symbol != PSA_STOP) {
             return i;
@@ -235,8 +234,8 @@ static int top_terminal (PSA_Stack *stack) {
 }
 
 /**
- * @brief Insert < symbol to stack to note Handle scope
- * @param stack Pointer to stack var
+ * @brief Insert stop marker < after top-most terminal (start of handle)
+ * @param stack Pointer to stack variable
  */
 static void insert_stop (PSA_Stack *stack) {
     if (stack->top == 0) {
@@ -264,15 +263,15 @@ static void insert_stop (PSA_Stack *stack) {
             break;
         }
         if (i == 0) {
-            error_exit(ERR_INTERNAL, 0 , "Failed to insert stop in insert_stop!");
+            error_exit(ERR_INTERNAL, 0, "Failed to insert stop in insert_stop!");
         }
     }
     stack->top++;
 }
 
 /**
- * @brief Frees the allocated memory
- * @param stack Pointer to stack var
+ * @brief Frees the stack, not the subtrees
+ * @param stack Pointer to stack variable
  */
 static void free_stack (PSA_Stack *stack) {
     free(stack->stack_items);
@@ -284,9 +283,9 @@ static void free_stack (PSA_Stack *stack) {
 // Stack code above
 
 /**
- * @brief Function to transform psa symbol enum names into actual operation enum names
- * @param symbol Symbol to check
- * @param line Line it's on
+ * @brief Converts a binary operator PSA symbol to operator_type from ast.h
+ * @param symbol Symbol to convert
+ * @param line Line for the error message
  * @return Corresponding operator from ast.h
  */
 static operator_type symbol2operator(psa_symbol symbol, int line) {
@@ -318,17 +317,17 @@ static operator_type symbol2operator(psa_symbol symbol, int line) {
     default:
         // Default should only run when the middle op isn't a bin op like E ( E
         error_exit(ERR_SYN, line, "Could not transform symbol to operator!");
-        return OP_PLUS; // Never reached only for complier
+        return OP_PLUS; // Never reached, only for compiler
     }
 }
 
 /**
- * @brief Reduces handle into a new tree
- * @param stack Pointer to stack var
+ * @brief Reduces handle into a subtree of a single new E and pushes it
+ * @param stack Pointer to stack variable
  */
 static void reduce(PSA_Stack *stack) {
     int count = 0;
-    Stack_Item handle[3]; // We can reduce a maximum of three (3) items, otherwise error
+    Stack_Item handle[3] = {0}; // We can reduce a maximum of three (3) items, otherwise error
 
     Stack_Item item_top = top_item(stack);
     while (item_top.item_symbol != PSA_STOP) {
@@ -350,7 +349,7 @@ static void reduce(PSA_Stack *stack) {
         return;
     }
 
-    // This will we our new subtree
+    // This will be our new subtree
     expr_struct *node = malloc(sizeof(expr_struct));
     if (node == NULL) {
         error_exit(ERR_INTERNAL, handle[0].line, "Failed to allocate memory for a new AST node while reducing!");
@@ -366,7 +365,7 @@ static void reduce(PSA_Stack *stack) {
         case TOKEN_IDENTIFIER:
             node->node_type = EXPR_VARIABLE;
             node->data.variable.id_name = handle[0].item_token.data.id;
-            node->result_type = TYPE_UNKNOWN; // We don't know yet, will check later
+            node->result_type = TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
             break;
         
         case TOKEN_INT_LITERAL:
@@ -398,7 +397,7 @@ static void reduce(PSA_Stack *stack) {
             break;
 
         default:
-            error_exit(ERR_SYN, handle[0].line, "Incorrect E -> i expression gramatics!");
+            error_exit(ERR_SYN, handle[0].line, "Incorrect E -> i expression grammar!");
         }
     }
 
@@ -406,7 +405,7 @@ static void reduce(PSA_Stack *stack) {
     else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_UNARY_MINUS) {
         line = handle[1].line;
 
-        // TODO: Type check (-string not allowed)
+        // TODO: Type check done later in a shared type-check function (-string not allowed)
         node->node_type = EXPR_UNA_OP;
         node->data.unary_op.op_type = OP_UNA_MINUS;
         node->data.unary_op.operand = handle[0].subtree;
@@ -417,7 +416,7 @@ static void reduce(PSA_Stack *stack) {
     else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_NOT) {
         line = handle[1].line;
 
-        // TODO: Type check (!string or !int/double not allowed)
+        // TODO: Type check done later in a shared type-check function (!string or !int/double not allowed)
         node->node_type = EXPR_UNA_OP;
         node->data.unary_op.op_type = OP_NOT;
         node->data.unary_op.operand = handle[0].subtree;
@@ -432,17 +431,15 @@ static void reduce(PSA_Stack *stack) {
         node->data.binary_op.op_type = symbol2operator(handle[1].item_symbol, handle[1].line);
         node->data.binary_op.left_operand = handle[2].subtree;
         node->data.binary_op.right_operand = handle[0].subtree;
-        node->result_type = TYPE_UNKNOWN; // TODO: check type
+        node->result_type = TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
     }
     
     else {
-        error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any gramatic rule!");
+        error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
     }
 
-    // Updated to store line
     node->line = line;
 
-    // Create a new AST node
     Stack_Item new_item = {.item_symbol = PSA_E, .line = line, .subtree = node};
 
     // Push a new item with a new subtree to stack
@@ -466,8 +463,8 @@ expr_struct *parse_expr(token_t first, token_t *next) {
 
     token_t token = first;              // Current working token
     psa_symbol prev = PSA_START_END;    // Previous symbol
-    int depth = 0;                      // Tracks the number open parentheses
-    int line = get_line_number();       
+    int depth = 0;                      // Tracks the number of open parentheses
+    int line = get_line_number();
 
     psa_symbol sym = token2symbol(token, prev, depth);
 
@@ -490,7 +487,7 @@ expr_struct *parse_expr(token_t first, token_t *next) {
             item = (Stack_Item){.item_symbol = sym, .item_token = token, .line = line};
             push_item(&stack, item);
 
-            // Check if we change context depth
+            // Update parentheses depth
             if (sym == PSA_LEFT_P) {
                 depth++;
             } else if (sym == PSA_RIGHT_P) {
@@ -537,22 +534,10 @@ expr_struct *parse_expr(token_t first, token_t *next) {
  * @return Pointer to the root of the expression tree
  */
 expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
-    // Field of voided things
     // TODO: Remove when used
     (void)first;
     (void)second;
     (void)next;
-    (void)precedence_table;
-    (void)init_stack;
-    (void)push_item;
-    (void)pop_item;
-    (void)top_item;
-    (void)top_terminal;
-    (void)insert_stop;
-    (void)free_stack;
-    (void)token2symbol;
-    (void)reduce;
-    (void)symbol2operator;
 
     return NULL;
 }
