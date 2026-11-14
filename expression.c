@@ -357,7 +357,11 @@ static void reduce(PSA_Stack *stack) {
 
     // E -> ~E
     else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_UNARY_MINUS) {
-        
+        // TODO: Type check (-string not allowed)
+        node->node_type = EXPR_UNA_OP;
+        node->data.unary_op.op_type = OP_UNA_MINUS;
+        node->data.unary_op.operand = handle[0].subtree;
+        node->result_type = handle[0].subtree->result_type;
     }
 
     // E -> E op E
