@@ -115,3 +115,67 @@ static void insert_builtin_funcs(void) {
         }
     }
 }
+
+/**
+ * @brief inserts all program functions into hashtable
+ * @param program struct with all functions in program
+ */
+static void insert_program_funcs(program_struct *program) {
+    int main_cnt = 0;
+    function_struct *cursor = program->first_func;
+    while (cursor != NULL) {
+        attributes attr = {0};
+        attr.symbol = function;
+        attr.main_flag = cursor->is_main;
+        attr.num_of_param = cursor->param_argc;
+        if (cursor->declared_ret_type != TYPE_UNKNOWN) {
+            attr.return_type = convert_type(cursor->declared_ret_type);
+            attr.ret_state = ret_inferred;
+        } else {
+            attr.ret_state = ret_unknown;
+        }
+        param_type *param = NULL;
+        if (cursor->param_argc > 0) {
+            param = malloc(sizeof(param_type) * cursor->param_argc);
+            if (param == NULL) {
+                error_exit(ERR_INTERNAL, cursor->line, "Memory allocation failed!");
+            }
+            for (int kdx = 0; kdx < cursor->param_argc; kdx++) {
+                param[kdx] = convert_type(cursor->param_args[kdx].param_type);
+            }
+            attr.param_type_array = param;
+        }
+        insert_status status = insert_hash(func_hash, cursor->func_name, &attr);
+        free(param);
+        if (status == insert_fail) {
+            error_exit(ERR_INTERNAL, cursor->line, "Insert hashtable failed!");
+        } else if (status == insert_duplicate) {
+            error_exit(ERR_SEM_RDEF, cursor->line, "Function '%s' is already defined!",
+                       cursor->func_name);
+        }
+        if (attr.main_flag) {
+            main_cnt++;
+            if (attr.num_of_param > 0) {
+                error_exit(ERR_SEM_ARG, cursor->line, "Main function cannot have parameters!");
+            } else if (attr.ret_state == ret_inferred && attr.return_type != unit_dt) {
+                error_exit(ERR_SEM_TYPE, cursor->line, "Return type is not Unit!");
+            }
+        }
+        cursor = cursor->next;
+    }
+    if (main_cnt == 0) {
+        error_exit(ERR_SEM_NDEF, 0, "Main is not defined in program!");
+    } else if (main_cnt > 1) {
+        error_exit(ERR_SEM_RDEF, 0, "Main is defined multiple times!");
+    }
+}
+
+void check_program(program_struct *program) {
+    func_hash = create_hashtable();
+    if (func_hash == NULL) {
+        error_exit(ERR_INTERNAL, 0, "Memory allocation failed!");
+    }
+    insert_builtin_funcs();
+    insert_program_funcs(program);
+    delete_hashtable(func_hash);
+}
