@@ -9,9 +9,29 @@
 #include "symtable.h"
 #include <stdlib.h>
 
+#define MAX_PARAMS 3
+
 static size_t codegen_next;
 static hashtable *func_hash;
 static hashtable *scope_hash;
+
+typedef struct builtin_func {
+    char *func_name;
+    size_t param_argc;
+    param_type p_type[MAX_PARAMS];
+    param_type return_type;
+} builtin_func;
+
+static const builtin_func funcs[] = {{"print", 1, {any_dt}, unit_dt},
+                                     {"readLine", 0, {0}, string_dt},
+                                     {"readInt", 0, {0}, int_dt},
+                                     {"readDouble", 0, {0}, double_dt},
+                                     {"toStr", 1, {any_dt}, string_dt},
+                                     {"toInt", 1, {double_dt}, int_dt},
+                                     {"strLength", 1, {string_dt}, int_dt},
+                                     {"subStr", 3, {string_dt, int_dt, int_dt}, string_dt},
+                                     {"ord", 2, {string_dt, int_dt}, int_dt},
+                                     {"chr", 1, {int_dt}, string_dt}};
 
 /**
  * @brief converts value_type to param_type
@@ -75,4 +95,23 @@ static attributes *search_variable(char *key) {
         cursor = cursor->parent;
     }
     return NULL;
+}
+
+/**
+ * @brief inserts all builtin functions into function table
+ */
+static void insert_builtin_funcs(void) {
+    size_t builtin_amount = sizeof(funcs) / sizeof(funcs[0]);
+    for (size_t idx = 0; idx < builtin_amount; idx++) {
+        attributes attr = {0};
+        attr.return_type = funcs[idx].return_type;
+        attr.num_of_param = funcs[idx].param_argc;
+        attr.param_type_array = (param_type *)funcs[idx].p_type;
+        attr.builtin_flag = true;
+        attr.symbol = function;
+        insert_status status = insert_hash(func_hash, funcs[idx].func_name, &attr);
+        if (status != insert_ok) {
+            error_exit(ERR_INTERNAL, 0, "Insert hashtable failed!");
+        }
+    }
 }
