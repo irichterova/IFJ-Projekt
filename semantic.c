@@ -59,3 +59,20 @@ static void pop_scope(void) {
     delete_hashtable(scope_hash);
     scope_hash = temp;
 }
+
+/**
+ * @brief searches variable that matches key
+ * @param key variable that we are looking for
+ * @return returns attributes of found variable, NULL if not found
+ */
+static attributes *search_variable(char *key) {
+    hashtable *cursor = scope_hash;
+    while (cursor != NULL) {
+        attributes *var = search_symbol(cursor, key);
+        if (var != NULL) {
+            return var;
+        }
+        cursor = cursor->parent;
+    }
+    return NULL;
+}
