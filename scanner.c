@@ -105,7 +105,6 @@ int convert_str2int (char* string) {
     char* endptr;
     long long number = strtoll(string, &endptr, 10);
     if (*endptr == '\0' && errno == 0 && number <= INT_MAX) return number;
-    error_exit(1, line_count, "Invalid number");
     return -1;
 }
 
@@ -119,7 +118,6 @@ double convert_str2dbl (char* string) {
     char* endptr;
     double number = strtod(string, &endptr);
     if (*endptr == '\0' && errno == 0) return number;
-    error_exit(1, line_count, "Invalid number");
     return -1;
 }
 
@@ -265,6 +263,10 @@ token_t get_token (enum eol_rules rule) {
                         token.type = TOKEN_DEDENT;
                         token.after_eol = eol_before_token;
                         return token;
+                    }
+                    if (stack_initialized) {
+                        stack_destruct(&indent_stack);
+                        stack_initialized = false;
                     }
                     token.type = TOKEN_EOF;
                     token.after_eol = eol_before_token;
@@ -509,8 +511,9 @@ token_t get_token (enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_INT_LITERAL;
                 token.data.int_value = convert_str2int(number_buffer.data);
-                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
+                if (token.data.int_value == -1) error_exit(1, line_count, "Invalid number");
+                token.after_eol = eol_before_token;
                 return token;
             case S_INT_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
@@ -605,8 +608,9 @@ token_t get_token (enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_DBL_LITERAL;
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
-                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
+                if (token.data.dbl_value == -1) error_exit(1, line_count, "Invalid number");
+                token.after_eol = eol_before_token;
                 return token;
             case S_DBL_DECIMAL_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
@@ -657,8 +661,9 @@ token_t get_token (enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_DBL_LITERAL;
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
-                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
+                if (token.data.dbl_value == -1) error_exit(1, line_count, "Invalid number");
+                token.after_eol = eol_before_token;
                 return token;
             case S_DBL_EXP_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
