@@ -186,7 +186,59 @@ static void check_block(statement_struct *statement) {
     pop_scope();
 }
 
+static void check_expression(expr_struct *expr) {
+}
+
+/**
+ * @brief checks semantic analysis of commands
+ * @param command struct with statement command
+ */
 static void check_command(statement_struct *command) {
+    attributes attr = {0};
+    insert_status status;
+    switch (command->stmt_type) {
+    case STMT_VAL:
+    case STMT_VAR:
+        check_expression(command->data.var_stmt.init_expr);
+        attr.symbol = variable;
+        if (command->stmt_type == STMT_VAR) {
+            attr.value_modif = modif_var;
+        } else {
+            attr.value_modif = nonmodif_val;
+        }
+        if (command->data.var_stmt.declared_type != TYPE_UNKNOWN) {
+            // TODO: in future data_type has to have value
+            attr.data_type = convert_type(command->data.var_stmt.declared_type);
+        }
+        attr.codegen_id = codegen_next;
+        command->data.var_stmt.codegen_id = codegen_next;
+        codegen_next++;
+        status = insert_hash(scope_hash, command->data.var_stmt.id_name, &attr);
+        if (status == insert_fail) {
+            error_exit(ERR_INTERNAL, command->line, "Insert hashtable failed!");
+        } else if (status == insert_duplicate) {
+            error_exit(ERR_SEM_RDEF, command->line, "Variable '%s' is already defined!",
+                       command->data.var_stmt.id_name);
+        }
+        break;
+    case STMT_RETURN:
+        if (command->data.ret_stmt != NULL) {
+            check_expression(command->data.ret_stmt);
+        }
+        break;
+    case STMT_EXPR:
+        check_expression(command->data.expr_stmt);
+        break;
+    case STMT_IF:
+        check_expression(command->data.if_stmt.if_expr);
+        check_block(command->data.if_stmt.then_stmt);
+        check_block(command->data.if_stmt.else_stmt);
+        break;
+    case STMT_WHILE:
+        check_expression(command->data.while_lp.while_expr);
+        check_block(command->data.while_lp.while_body);
+        break;
+    }
 }
 
 /**
