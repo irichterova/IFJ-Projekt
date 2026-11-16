@@ -11,6 +11,8 @@
 
 #define MAX_PARAMS 3
 
+static void check_command(statement_struct *command);
+
 static size_t codegen_next;
 static hashtable *func_hash;
 static hashtable *scope_hash;
@@ -170,6 +172,49 @@ static void insert_program_funcs(program_struct *program) {
     }
 }
 
+/**
+ * @brief checks semantic analysis of block
+ * @param statement struct with first statement of the block
+ */
+static void check_block(statement_struct *statement) {
+    push_scope();
+    statement_struct *cursor = statement;
+    while (cursor != NULL) {
+        check_command(cursor);
+        cursor = cursor->next;
+    }
+    pop_scope();
+}
+
+static void check_command(statement_struct *command) {
+}
+
+/**
+ * @brief checks semantic analysis of function
+ * @param func struct with function attributes
+ */
+static void check_function(function_struct *func) {
+    push_scope();
+    for (int jdx = 0; jdx < func->param_argc; jdx++) {
+        attributes attr = {0};
+        attr.symbol = variable;
+        attr.value_modif = nonmodif_val;
+        attr.data_type = convert_type(func->param_args[jdx].param_type);
+        attr.codegen_id = codegen_next;
+        func->param_args[jdx].codegen_id = codegen_next;
+        codegen_next++;
+        insert_status status = insert_hash(scope_hash, func->param_args[jdx].param_name, &attr);
+        if (status == insert_fail) {
+            error_exit(ERR_INTERNAL, func->line, "Insert hashtable failed!");
+        } else if (status == insert_duplicate) {
+            error_exit(ERR_SEM_RDEF, func->line, "Parameter '%s' is already defined!",
+                       func->param_args[jdx].param_name);
+        }
+    }
+    check_block(func->stmt_body);
+    pop_scope();
+}
+
 void check_program(program_struct *program) {
     func_hash = create_hashtable();
     if (func_hash == NULL) {
@@ -177,5 +222,10 @@ void check_program(program_struct *program) {
     }
     insert_builtin_funcs();
     insert_program_funcs(program);
+    function_struct *cursor = program->first_func;
+    while (cursor != NULL) {
+        check_function(cursor);
+        cursor = cursor->next;
+    }
     delete_hashtable(func_hash);
 }
