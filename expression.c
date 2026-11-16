@@ -11,6 +11,8 @@
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
 
+static int call_depth = 0; // Number of open parenthesis inside a function call
+
 // Symbols defining the table, order must match rows/columns of precedence_table
 typedef enum {
     PSA_UNARY_MINUS, // ~
@@ -77,7 +79,7 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
  */
 static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
     // EOL outside parentheses means end of expression
-    if (token.after_eol && depth == 0) {
+    if (token.after_eol && depth == 0 && call_depth == 0) {
         return PSA_START_END;
     }
 
@@ -451,6 +453,60 @@ static void reduce(PSA_Stack *stack) {
 
     // Push a new item with a new subtree to stack
     push_item(stack, new_item);
+}
+
+/**
+ * @brief Parses a function call id ( args ), each argument recursively via parse_expr, and creates an EXPR_CALL_FUNC node
+ * @param id_token Identifier token with the function name
+ * @param line Line of the function name, for the node and error messages
+ * @param next Where to store the first token after the closing parenthesis
+ * @return AST node of the function call (later pushed as E in run_psa)
+ */
+static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
+    expr_struct *node = malloc(sizeof(expr_struct));
+    if (node == NULL) {
+        error_exit(ERR_INTERNAL, line, "Failed to malloc memory for a node in parse_call!");
+    }
+
+    node->node_type = EXPR_CALL_FUNC;
+    node->line = line;
+    node->result_type = TYPE_UNKNOWN;
+
+    node->data.call_fn.name = id_token.data.id;
+    node->data.call_fn.args = NULL;
+    node->data.call_fn.argc = 0;
+
+    call_depth++; // We are entering parenthesis
+
+    // Get the first token after (
+    token_t token = get_token(EOL_OPTIONAL);
+    // ) right away means no argument
+    if (token.type != TOKEN_R_PARENTH) {
+        while (1) {
+            // Either , or )
+            expr_struct *arg = parse_expr(token, &token);
+            // Realloc basically acts as a malloc too
+            expr_struct **tmp = realloc(node->data.call_fn.args, (node->data.call_fn.argc + 1) * sizeof(expr_struct *));
+            if (tmp == NULL) {
+                error_exit(ERR_INTERNAL, line, "Couldn't allocate memory to a new argument in parse_call!");
+            }
+            node->data.call_fn.args = tmp;
+            node->data.call_fn.args[node->data.call_fn.argc] = arg;
+            node->data.call_fn.argc++;
+
+            if (token.type == TOKEN_COMMA) {
+                token = get_token(EOL_OPTIONAL);
+                continue;
+            } else if (token.type == TOKEN_R_PARENTH) {
+                break;
+            } else {
+                error_exit(ERR_SYN, line, "Wrong function arguments grammar!");
+            }
+        }
+    }
+    call_depth--; // We left a pair of parentheses
+    *next = get_token(EOL_OPTIONAL);
+    return node;
 }
 
 /**
