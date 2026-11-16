@@ -186,7 +186,46 @@ static void check_block(statement_struct *statement) {
     pop_scope();
 }
 
+/**
+ * @brief checks semantic analysis of expression
+ * @param expr struct with expression
+ */
 static void check_expression(expr_struct *expr) {
+    attributes *expr_attr;
+    switch (expr->node_type) {
+    case EXPR_VARIABLE:
+        expr_attr = search_variable(expr->data.variable.id_name);
+        if (expr_attr == NULL) {
+            error_exit(ERR_SEM_NDEF, expr->line, "Variable '%s' is not defined!",
+                       expr->data.variable.id_name);
+        }
+        expr->data.variable.codegen_id = expr_attr->codegen_id;
+        break;
+    case EXPR_UNA_OP:
+        check_expression(expr->data.unary_op.operand);
+        break;
+    case EXPR_BIN_OP:
+        check_expression(expr->data.binary_op.left_operand);
+        check_expression(expr->data.binary_op.right_operand);
+        break;
+    case EXPR_CALL_FUNC:
+        expr_attr = search_symbol(func_hash, expr->data.call_fn.name);
+        if (expr_attr == NULL) {
+            error_exit(ERR_SEM_NDEF, expr->line, "Function '%s' is not defined!",
+                       expr->data.call_fn.name);
+        }
+        if (expr_attr->num_of_param != (size_t)expr->data.call_fn.argc) {
+            error_exit(ERR_SEM_ARG, expr->line,
+                       "Amount of arguments in function '%s' does not match!",
+                       expr->data.call_fn.name);
+        }
+        for (int hdx = 0; hdx < expr->data.call_fn.argc; hdx++) {
+            check_expression(expr->data.call_fn.args[hdx]);
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 /**
