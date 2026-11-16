@@ -565,7 +565,6 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
             if (second_token_pending) {
                 second_token_pending = 0;
                 token = second;
-                token.after_eol = false;
             } else {
                 token = get_token(EOL_OPTIONAL);
             }
