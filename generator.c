@@ -10,14 +10,11 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include <string.h>
 
 /* Global counter for cycles (if, while) */
 static int cycle_counter = 0;
 static char *func_name = NULL;
 static value_type func_ret = TYPE_UNKNOWN;
-static value_type var1_type = TYPE_UNKNOWN;
-static value_type var2_type = TYPE_UNKNOWN;
 
 /* INT2FLOATS conversion */
 void int2float(value_type first_type, value_type second_type);
@@ -621,6 +618,47 @@ void to_str()
     newline_emit_expr("PUSHS string@()");
 
     newline_emit_expr("LABEL fn_end_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+void read_line()
+{
+    char *builtin_name = "$builtin_readline";
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@$value");
+    newline_emit_expr("READ LF@$value string");
+    newline_emit_expr("DEFVAR LF@$type");
+    newline_emit_expr("TYPE LF@$type LF@$value");
+
+    newline_emit_expr("JUMPIFEQ eof_line LF@$type string@nil");
+    newline_emit_expr("PUSHS LF@$value");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+    newline_emit_expr("LABEL eof_line");
+    newline_emit_expr("PUSHS string@()");
+
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+void read_int()
+{
+    char *builtin_name = "$builtin_readint";
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@$val");
+    newline_emit_expr("READ LF@$val int");
+    newline_emit_expr("DEFVAR LF@$type");
+    newline_emit_expr("TYPE LF@$type LF@$val");
+
+    newline_emit_expr("JUMPIFEQ int_err string@nil");
+    newline_emit_expr("PUSHS LF@$val");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
+    newline_emit_expr("LABEL int_err");
+    newline_emit_expr("PUSHS int@0");
+
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
