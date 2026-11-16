@@ -14,6 +14,9 @@
 #include "buffer.h"
 #include "error.h"
 
+/**
+ * @brief States of the finite state machine used by the scanner
+ */
 enum states {
     S_START,
     S_GT,
@@ -69,8 +72,13 @@ char* keywords_arr[] = {
     "for",
 };
 
-static int line_count = 1;
+static int line_count = 1;  //Keeps track of the current line number
 
+/**
+ * @brief Reads the next symbol to be processed
+ * @param pending_symbol Pointer to the symbol waiting to be processed
+ * @return Pending symbol if there's one; symbol from stdin otherwise
+ */
 int read_symbol (int* pending_symbol) {
     if (*pending_symbol != -1) {
         int symbol = *pending_symbol;
@@ -98,7 +106,7 @@ int compare_with_keywords (char* identifier) {
 /**
  * @brief Converts the string to integer 
  * @param string String ending with '\0' to be converted to integer
- * @return Converted integer value if the conversion was successful
+ * @return Converted integer value if the conversion was successful; -1 otherwise
  */
 int convert_str2int (char* string) {
     errno = 0;
@@ -111,7 +119,7 @@ int convert_str2int (char* string) {
 /**
  * @brief Converts the string to double
  * @param string String ending with '\0'to be converted to double
- * @return Converted double value if the conversion was successful
+ * @return Converted double value if the conversion was successful; -1 otherwise
  */
 double convert_str2dbl (char* string) {
     errno = 0;
@@ -137,6 +145,7 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
  * @param line_indent Pointer to the variable storing the current indentation level
  * @param symbol Character read from stdin 
  * @param tab_at_beginning Pointer to a flag indicating the presence of a tab at the beginning of the physical line
+ * @param pending_symbol Pointer to the symbol waiting to be processed
  */
 void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning, int* pending_symbol) {
     *line_indent = 0; // indentation measurement starts at 0
@@ -156,6 +165,7 @@ void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning, 
  * @param indent_stack Pointer to the stack storing indentation levels
  * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
  * @param symbol Last read character to be returned to stdin
+ * @param pending_symbol Pointer to the symbol waiting to be processed
  * @note A line_indent value of -1 indicates that the line indentation has already been processed 
  */
 void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, int* pending_symbol) {
@@ -181,6 +191,7 @@ void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* toke
  * @param indent_stack Pointer to the stack storing indentation levels
  * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
  * @param symbol Last read character to be returned to stdin
+ * @param pending_symbol Pointer to the symbol waiting to be processed
  * @param tab_at_beginning Flag indicating the presence of a tab at the beginning of the physical line
  * @param logical_line_cont Indicates whether the current line is a continuation of a logical line
  * @return true if the indentation stack was updated and the token needs to be returned; false otherwise
