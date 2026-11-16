@@ -38,3 +38,13 @@ int stack_top (stack_t* stack) {
     }
     return (stack->top->data);
 }
+
+bool stack_is_empty (stack_t* stack) {
+    return (stack->top == NULL);
+}
+
+void stack_destruct (stack_t* stack) {
+    while (!(stack_is_empty(stack))) {
+        stack_pop(stack);
+    }
+}

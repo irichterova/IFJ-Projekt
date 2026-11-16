@@ -32,6 +32,8 @@ enum token_types {
     TOKEN_OP_NOT,
     TOKEN_OP_AND,
     TOKEN_OP_OR,
+    TOKEN_GENERATOR_ARROW,
+    TOKEN_FUNCTION_ARROW,
     TOKEN_ASSIGN,
     TOKEN_COLON,
     TOKEN_SEMICOLON,
@@ -59,6 +61,7 @@ enum keywords_enum {
     KEYWORD_VAR,
     KEYWORD_WHILE,
     KEYWORD_BOOLEAN,
+    KEYWORD_FOR,
 };
 
 enum eol_rules {
