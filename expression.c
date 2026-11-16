@@ -463,8 +463,8 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
     Stack_Item start_item = {.item_symbol = PSA_START_END};
     push_item(&stack, start_item);
 
-    token_t token = first;            // Current working token
-    token.after_eol = false;
+    token_t token = first;              // Current working token
+    token.after_eol = false;            // Newline from tokens from parser is ignored
     psa_symbol prev = PSA_START_END;    // Previous symbol
     int depth = 0;                      // Tracks the number of open parentheses
     int line = get_line_number();
@@ -543,77 +543,8 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
  * @return Pointer to the root of the expression tree
  */
 expr_struct *parse_expr(token_t first, token_t *next) {
-    // First we init stack and push first $
-
-    PSA_Stack stack;
-    init_stack(&stack);
-
-    Stack_Item start_item = {.item_symbol = PSA_START_END};
-    push_item(&stack, start_item);
-
-    token_t token = first;              // Current working token
-    psa_symbol prev = PSA_START_END;    // Previous symbol
-    int depth = 0;                      // Tracks the number of open parentheses
-    int line = get_line_number();
-
-    psa_symbol sym = token2symbol(token, prev, depth);
-
-    // Main loop
-    while(1) {
-        int t = top_terminal(&stack);
-        psa_symbol top_sym = stack.stack_items[t].item_symbol;
-
-        // End condition [$, $]
-        if (top_sym == PSA_START_END && sym == PSA_START_END) {
-            break;
-        }
-
-        Stack_Item item;
-        switch (precedence_table[top_sym][sym]) {
-        case PSA_REL_SHIFT:
-            insert_stop(&stack);
-            /* Fallthrough */
-        case PSA_REL_PUSH:
-            item = (Stack_Item){.item_symbol = sym, .item_token = token, .line = line};
-            push_item(&stack, item);
-
-            // Update parentheses depth
-            if (sym == PSA_LEFT_P) {
-                depth++;
-            } else if (sym == PSA_RIGHT_P) {
-                depth--;
-            }
-            // Save current symbol and get a new token and convert it
-            prev = sym;
-            token = get_token(EOL_OPTIONAL);
-            line = get_line_number();
-            sym = token2symbol(token, prev, depth);
-            break;
-
-        case PSA_REL_REDUCE:
-            reduce(&stack);
-            break;
-        case PSA_REL_ERROR:
-            error_exit(ERR_SYN, line, "Incorrect expression syntax!");
-            break;
-        
-        default:
-            error_exit(ERR_SYN, line, "Relation somehow not in precedence table?");
-            break;
-        }
-    }
-
-    // Save the tree
-    Stack_Item final_item = pop_item(&stack);
-    if (final_item.item_symbol != PSA_E) {
-        error_exit(ERR_SYN, line, "Incorrect expression structure!");
-    }
-
-    expr_struct* root = final_item.subtree;
-
-    *next = token;
-    free_stack(&stack);
-    return root;
+    // When we only know one token, disable the second
+    return run_psa(first, first, 0, next);
 }
 
 /**
@@ -624,81 +555,6 @@ expr_struct *parse_expr(token_t first, token_t *next) {
  * @return Pointer to the root of the expression tree
  */
 expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
-    // First we init stack and push first $
-
-    PSA_Stack stack;
-    init_stack(&stack);
-
-    Stack_Item start_item = {.item_symbol = PSA_START_END};
-    push_item(&stack, start_item);
-
-    token_t token = first;              // Current working token
-    psa_symbol prev = PSA_START_END;    // Previous symbol
-    int depth = 0;                      // Tracks the number of open parentheses
-    int line = get_line_number();
-
-    psa_symbol sym = token2symbol(token, prev, depth);
-    int second_token_pending = 1; // Set to 0 after used
-
-    // Main loop
-    while(1) {
-        int t = top_terminal(&stack);
-        psa_symbol top_sym = stack.stack_items[t].item_symbol;
-
-        // End condition [$, $]
-        if (top_sym == PSA_START_END && sym == PSA_START_END) {
-            break;
-        }
-
-        Stack_Item item;
-        switch (precedence_table[top_sym][sym]) {
-        case PSA_REL_SHIFT:
-            insert_stop(&stack);
-            /* Fallthrough */
-        case PSA_REL_PUSH:
-            item = (Stack_Item){.item_symbol = sym, .item_token = token, .line = line};
-            push_item(&stack, item);
-
-            // Update parentheses depth
-            if (sym == PSA_LEFT_P) {
-                depth++;
-            } else if (sym == PSA_RIGHT_P) {
-                depth--;
-            }
-            // Save current symbol and get a new token and convert it
-            prev = sym;
-            if (second_token_pending) {
-                second_token_pending = 0;
-                token = second;
-            } else {
-                token = get_token(EOL_OPTIONAL);
-            }
-            line = get_line_number();
-            sym = token2symbol(token, prev, depth);
-            break;
-
-        case PSA_REL_REDUCE:
-            reduce(&stack);
-            break;
-        case PSA_REL_ERROR:
-            error_exit(ERR_SYN, line, "Incorrect expression syntax!");
-            break;
-        
-        default:
-            error_exit(ERR_SYN, line, "Relation somehow not in precedence table?");
-            break;
-        }
-    }
-
-    // Save the tree
-    Stack_Item final_item = pop_item(&stack);
-    if (final_item.item_symbol != PSA_E) {
-        error_exit(ERR_SYN, line, "Incorrect expression structure!");
-    }
-
-    expr_struct* root = final_item.subtree;
-
-    *next = token;
-    free_stack(&stack);
-    return root;
+    // When we get a second token as well, use it instead of asking for a new one
+    return run_psa(first, second, 1, next);
 }
