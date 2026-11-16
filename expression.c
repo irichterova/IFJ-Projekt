@@ -433,6 +433,13 @@ static void reduce(PSA_Stack *stack) {
         node->data.binary_op.right_operand = handle[0].subtree;
         node->result_type = TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
     }
+
+    // E -> () special Unit rule
+    else if (count == 2 && handle[1].item_symbol == PSA_LEFT_P && handle[0].item_symbol == PSA_RIGHT_P) {
+        line = handle[1].line;
+        node->node_type = EXPR_LIT_UNIT;
+        node->result_type = TYPE_UNIT;
+    }
     
     else {
         error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
