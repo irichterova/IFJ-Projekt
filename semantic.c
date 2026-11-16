@@ -276,7 +276,11 @@ static void check_function(function_struct *func) {
                        func->param_args[jdx].param_name);
         }
     }
-    check_block(func->stmt_body);
+    statement_struct *cursor = func->stmt_body;
+    while (cursor != NULL) {
+        check_command(cursor);
+        cursor = cursor->next;
+    }
     pop_scope();
 }
 
