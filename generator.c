@@ -25,7 +25,7 @@ void int2float(value_type first_type, value_type second_type);
 void check_ptr(void *ptr);
 
 /*  Built in functions */
-void print_fun();
+void print_func();
 void read_line();
 void read_int();
 void read_double();
@@ -493,5 +493,39 @@ void gen_function(function_struct *function)
     newline_emit_expr("LABEL end_%s", func_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
+}
+void print_func()
+{
+    char *builtin_name = "$builtin_print";
+    int builtin_id = 0;
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@msg$%i", builtin_id);
+    newline_emit_expr("POPS LF@msg$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@$type");
+    newline_emit_expr("TYPE LF@$type LF@msg%i", builtin_id);
+    newline_emit_expr("JUMPIFEQ print_nil LF@$type string@nil");
+    newline_emit_expr("WRITE LF@msg$%i", builtin_id);
+    newline_emit_expr("JUMP fn_end_%s", builtin_name);
+    newline_emit_expr("LABEL print_nil");
+    newline_emit_expr("WRITE string@()");
+    newline_emit_expr("LABEL fn_end_%s", builtin_name);
+    newline_emit_expr("PUSHS nil@nil");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+void str_len()
+{
+    char *builtin_name = "$builtin_strlen";
+    int builtin_id = 0;
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@str$%i", builtin_id);
+    newline_emit_expr("POPS LF@str$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@$len");
+    newline_emit_expr("STRLEN LF@$len LF$str$%i", builtin_id);
+    newline_emit_expr("PUSHS LF@$len");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("POPFRAME");
 }
 
