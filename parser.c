@@ -7,6 +7,7 @@
 #include "parser.h"
 #include "error.h"
 #include "scanner.h"
+#include "expression.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -82,17 +83,6 @@ static statement_struct *create_stmt(int line, statement_type type) {
     stmt->line = line;
     stmt->stmt_type = type;
     return stmt;
-}
-
-// temporary, PSA will replace
-static expr_struct *parse_expr_temp(void) {
-    if (token.type == TOKEN_IDENTIFIER) {
-        free(token.data.id);
-    } else if (token.type == TOKEN_STR_LITERAL) {
-        free(token.data.str_value);
-    }
-    next_token(EOL_OPTIONAL);
-    return NULL;
 }
 
 /**
@@ -233,7 +223,7 @@ static statement_struct *parse_def_var(void) {
     }
     stmt->data.var_stmt.declared_type = parse_optional_type();
     type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
-    stmt->data.var_stmt.init_expr = parse_expr_temp();
+    stmt->data.var_stmt.init_expr = parse_expr(token, &token);
     parse_statement_end();
     return stmt;
 }
@@ -246,7 +236,7 @@ static statement_struct *parse_return(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_RETURN);
     next_token(EOL_OPTIONAL);
     if (!token.after_eol && token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT) {
-        stmt->data.ret_stmt = parse_expr_temp();
+        stmt->data.ret_stmt = parse_expr(token, &token);
     }
     parse_statement_end();
     return stmt;
@@ -264,19 +254,10 @@ static statement_struct *parse_statement_id(token_t id_token, int line) {
         stmt = create_stmt(line, STMT_ASSIGN);
         stmt->data.id_stmt.id_name = id_token.data.id;
         next_token(EOL_FORBIDDEN);
-        stmt->data.id_stmt.assign_expr = parse_expr_temp();
+        stmt->data.id_stmt.assign_expr = parse_expr(token, &token);
     } else {
         stmt = create_stmt(line, STMT_EXPR);
-        free(id_token.data.id);
-        while (token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT &&
-               token.type != TOKEN_EOF && !token.after_eol) {
-            if (token.type == TOKEN_IDENTIFIER) {
-                free(token.data.id);
-            } else if (token.type == TOKEN_STR_LITERAL) {
-                free(token.data.str_value);
-            }
-            next_token(EOL_OPTIONAL);
-        }
+        stmt->data.expr_stmt = parse_expr_rest(id_token, token, &token);
     }
     return stmt;
 }
@@ -310,7 +291,7 @@ static statement_struct *parse_statement(void) {
             return stmt;
         } else {
             statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
-            stmt->data.expr_stmt = parse_expr_temp();
+            stmt->data.expr_stmt = parse_expr(token, &token);
             parse_statement_end();
             return stmt;
         }
@@ -359,7 +340,7 @@ static statement_struct *parse_else(void) {
 static statement_struct *parse_if(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_IF);
     next_token(EOL_FORBIDDEN);
-    stmt->data.if_stmt.if_expr = parse_expr_temp();
+    stmt->data.if_stmt.if_expr = parse_expr(token, &token);
     keyword_t_check(KEYWORD_THEN, EOL_REQUIRED);
     stmt->data.if_stmt.then_stmt = parse_block();
     stmt->data.if_stmt.else_stmt = parse_else();
@@ -373,7 +354,7 @@ static statement_struct *parse_if(void) {
 static statement_struct *parse_while(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_WHILE);
     next_token(EOL_FORBIDDEN);
-    stmt->data.while_lp.while_expr = parse_expr_temp();
+    stmt->data.while_lp.while_expr = parse_expr(token, &token);
     keyword_t_check(KEYWORD_DO, EOL_REQUIRED);
     stmt->data.while_lp.while_body = parse_block();
     return stmt;
@@ -388,7 +369,7 @@ static statement_struct *parse_body(void) {
         return parse_block();
     } else {
         statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
-        stmt->data.expr_stmt = parse_expr_temp();
+        stmt->data.expr_stmt = parse_expr(token, &token);
         if (!token.after_eol && token.type != TOKEN_EOF) {
             error_exit(ERR_SYN, get_line_number(), "Expected eol after function body!");
         }
