@@ -9,6 +9,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include "generator.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 /* Global counter for cycles (if, while) */
 static int cycle_counter = 0;
@@ -18,7 +19,10 @@ static value_type var1_type = TYPE_UNKNOWN;
 static value_type var2_type = TYPE_UNKNOWN;
 
 /* INT2FLOATS conversion */
-void int2float(value_type var1_type, value_type var2_type);
+void int2float(value_type first_type, value_type second_type);
+
+/* Check validation of pointers */
+void check_ptr(void *ptr);
 
 /*  Built in functions */
 void print_fun();
@@ -80,14 +84,35 @@ void emit_expr_str(char *str)
         }
     }
 }
-
+/**
+ * @brief   Checks if data type conversion between two variables is needed and generates the conversion 
+ * @param   var1_type   First variable that could be data type INT (integer)
+ * @param   var2_type   Second variable that could be data type FLOAT (double/float)
+ */
 void int2float(value_type var1_type, value_type var2_type)
 {
     if(var1_type == TYPE_INT && var2_type == TYPE_DOUBLE)
     {
         newline_emit_expr("INT2FLOATS");
     }
+    else 
+    return;
 }
+/**
+ * @brief   Checks if pointer is NULL, if the specific pointer is not allowed to be NULL, exit with internal error code 99
+ * @param   ptr Pointer that is being checked  
+ */
+void check_ptr(void *ptr)
+{
+    if(ptr == NULL)
+    {
+        fprintf(stderr, "Internal error");
+        exit(99);
+    }
+    else
+    return;
+}
+
 /** 
  * @brief  Generates the final code in IFJ26code 
  * @param  program_code    A valid pointer to a structure program code
@@ -117,9 +142,9 @@ int gen_code(program_struct *program_code)
     newline_emit_expr("EXIT int@0");
 
     /*  Generate rest of the body of the code */
-    for(function_struct *f = program_code->first_func; f != NULL; f = f->next)
+    for(function_struct *func = program_code->first_func; func != NULL; func = func->next)
     {
-        gen_function(f);
+        gen_function(func);
     }
     return 0;
 }
@@ -185,6 +210,7 @@ void gen_expression(expr_struct* expression)
             newline_emit_expr("%s LF@%s$%zu", msg, expression->data.variable.id_name, expression->data.variable.codegen_id);
             break;
         case EXPR_UNA_OP:
+            check_ptr(expression->data.unary_op.operand);
         /* If the literal is type of int, push integer zero, if the literal is type double, push zero in float format.
         Subtract the expression value */
             if(expression->result_type == TYPE_INT)
@@ -200,21 +226,17 @@ void gen_expression(expr_struct* expression)
         /* For binar operators, there are two expressions - operands, we have to print out both of them */
             expr_struct *left_op = expression->data.binary_op.left_operand;
             expr_struct *right_op = expression->data.binary_op.right_operand;
+            check_ptr(left_op);
+            check_ptr(right_op);
             value_type left_type = left_op->result_type;
             value_type right_type = right_op->result_type;
 
             gen_expression(left_op);
             /*  Check if conversion between operands is needed, if the data types are different (int/float) convert int to float */
-            if(left_type == TYPE_INT && right_type == TYPE_DOUBLE)
-            {
-                newline_emit_expr("INT2FLOATS");
-            }
+            int2float(left_type, right_type);
             gen_expression(right_op);
-            if(right_type == TYPE_INT && left_type == TYPE_DOUBLE)
-            {
-                newline_emit_expr("INT2FLOATS");
-            }
-     
+            int2float(right_type, left_type);
+
             switch(expression->data.binary_op.op_type)
             {
                 /* Recognize the correct PLUS operation depending on the result type, if the result is a string - do concatenation
@@ -302,24 +324,22 @@ void gen_statement(statement_struct* statement)
         case STMT_VAL:
         case STMT_VAR:
         {
+            check_ptr(statement->data.var_stmt.init_expr);
+            check_ptr(statement->data.var_stmt.id_name);
             expr_struct *var_init = statement->data.var_stmt.init_expr;
             gen_expression(var_init);
-            /*  Check if conversion is needed*/
-            if(statement->data.var_stmt.declared_type == TYPE_DOUBLE && var_init->result_type == TYPE_INT)
-            {
-                newline_emit_expr("INT2FLOATS");
-            }
+            /*  Check if conversion is needed */
+            int2float(var_init->result_type, statement->data.var_stmt.declared_type);
             newline_emit_expr("%s LF@%s$%zu", msg, statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
             break;   
         }
         case STMT_ASSIGN:
         {
+            check_ptr(statement->data.id_stmt.id_name);
+            check_ptr(statement->data.id_stmt.assign_expr);
             expr_struct *asgn_expr = statement->data.id_stmt.assign_expr;
             gen_expression(asgn_expr);
-            if(statement->data.id_stmt.id_type == TYPE_DOUBLE && asgn_expr->result_type == TYPE_INT)
-            {
-                newline_emit_expr("INT2FLOATS");
-            }
+            int2float(asgn_expr->result_type, statement->data.id_stmt.id_type);
             newline_emit_expr("%s LF@%s$%zu", msg, statement->data.id_stmt.id_name, statement->data.id_stmt.codegen_id);
             break;
         }
@@ -363,10 +383,7 @@ void gen_statement(statement_struct* statement)
             if(statement->data.ret_stmt != NULL)
             {
                 gen_expression(statement->data.ret_stmt);
-                if(statement->data.ret_stmt->result_type == TYPE_INT && func_ret == TYPE_DOUBLE)
-                {
-                    newline_emit_expr("INT2FLOATS");
-                }
+                int2float(statement->data.ret_stmt->result_type, func_ret);
             }
             /* No return value left on the stack  */
             else 
@@ -389,9 +406,9 @@ void gen_statement(statement_struct* statement)
             newline_emit_expr("JUMPIFEQS end_while_%i", while_counter);
 
             /* While the condition is filled */
-            for(statement_struct *s = statement->data.while_lp.while_body; s != NULL; s = s->next)
+            for(statement_struct *stmt = statement->data.while_lp.while_body; stmt != NULL; stmt = stmt->next)
             {
-                gen_statement(s);
+                gen_statement(stmt);
             } 
             newline_emit_expr("JUMP while_%i", while_counter);
 
@@ -409,6 +426,7 @@ void gen_statement(statement_struct* statement)
 */
 void gen_function(function_struct *function)
 {
+    check_ptr(function->func_name);
     /* Set global variables to a current function attributes, so the other functions can use them */ 
     func_name = function->func_name;
     func_ret = function->result_ret_type;
@@ -417,10 +435,19 @@ void gen_function(function_struct *function)
     newline_emit_expr("LABEL fn_%s", func_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$trash");
+
+    if(function->param_argc != 0)
+    {
+        for(int i = 0; i < function->param_argc; i++)
+        {
+            check_ptr(function->param_args[i].param_name);
+        }
+    }
+
     /* Define all the variables in the functions arguments */
     for(int i = 0; i< function->param_argc; i++)
     {
-     newline_emit_expr("DEFVAR LF@%s$%zu", function->param_args[i].param_name, function->param_args[i].codegen_id);
+        newline_emit_expr("DEFVAR LF@%s$%zu", function->param_args[i].param_name, function->param_args[i].codegen_id);
     }
     /*  Define all the variables in the body of the function */
     emit_defvar(function->stmt_body);
