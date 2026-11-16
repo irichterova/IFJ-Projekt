@@ -66,6 +66,7 @@ char* keywords_arr[] = {
     "var",
     "while",
     "Boolean",
+    "for",
 };
 
 static int line_count = 1;
@@ -369,6 +370,11 @@ token_t get_token (enum eol_rules rule) {
                     token.after_eol = eol_before_token;
                     return token;
                 }
+                else if (symbol == '-') {
+                    token.type = TOKEN_GENERATOR_ARROW;
+                    token.after_eol = eol_before_token;
+                    return token;
+                }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
@@ -378,6 +384,11 @@ token_t get_token (enum eol_rules rule) {
             case S_ASSIGN:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_EQ;
+                    token.after_eol = eol_before_token;
+                    return token;
+                }
+                else if (symbol == '>') {
+                    token.type = TOKEN_FUNCTION_ARROW;
                     token.after_eol = eol_before_token;
                     return token;
                 }
