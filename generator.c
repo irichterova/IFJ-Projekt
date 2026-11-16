@@ -504,13 +504,18 @@ void print_func()
     newline_emit_expr("DEFVAR LF@msg$%i", builtin_id);
     newline_emit_expr("POPS LF@msg$%i", builtin_id);
     newline_emit_expr("DEFVAR LF@$type");
+    /*  Save the data type of the term to a temporary variable $type*/
     newline_emit_expr("TYPE LF@$type LF@msg%i", builtin_id);
+    /*  If the data type is nil, jump to print_nil*/
     newline_emit_expr("JUMPIFEQ print_nil LF@$type string@nil");
+    /*  For any other data type */
     newline_emit_expr("WRITE LF@msg$%i", builtin_id);
     newline_emit_expr("JUMP fn_end_%s", builtin_name);
+    /*  Print nil () */
     newline_emit_expr("LABEL print_nil");
     newline_emit_expr("WRITE string@()");
     newline_emit_expr("LABEL fn_end_%s", builtin_name);
+
     newline_emit_expr("PUSHS nil@nil");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
@@ -538,6 +543,7 @@ void chr()
     newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
     newline_emit_expr("POPS LF@value$%i", builtin_id);
     newline_emit_expr("DEFVAR LF@$char");
+    /* Convert the integer to a char with the ASCII value of the integer and save it to a temporary variable $char, return the char*/
     newline_emit_expr("INT2STR LF@$char LF@value$%i", builtin_id);
     newline_emit_expr("PUSHS LF@$char");
     newline_emit_expr("POPFRAME");
@@ -554,6 +560,7 @@ void ord()
     newline_emit_expr("POPS LF@str$%i", builtin_id);
     newline_emit_expr("POPS LF@idx$%i", builtin_id);
     newline_emit_expr("DEFVAR LF@$value");
+    /*  Convert the char on the index of the string to a ASCII value and save it to temporary value $value*/
     newline_emit_expr("STRI2INT LF@$value LF@str$%i LF@idx$%i", builtin_id, builtin_id);
     newline_emit_expr("PUSHS LF@$value");
     newline_emit_expr("POPFRAME");
@@ -568,8 +575,52 @@ void to_int()
     newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
     newline_emit_expr("POPS LF@value$%i", builtin_id);
     newline_emit_expr("DEFVAR LF@$float");
-    newline_emit_expr("FLOAT2INT LF@$float LF@value$%i", builtin_id);
+    /*  Convert float to integer and save it to temporary variable $float */
+    newline_emit_expr("FLOAT2INT LF@value$%i LF@$loat", builtin_id);
     newline_emit_expr("PUSHS LF@$float");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+
+void to_str()
+{
+    char *builtin_name = "$builtin_tostr";
+    int builtin_id = 0;
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
+    newline_emit_expr("POPS LF@value$%i", builtin_id);
+
+    /*  Compare data type of the value with all the other data types and jump to the right label */
+    newline_emit_expr("JUMPIFEQ int_type LF@value$%i int@0", builtin_id);
+    newline_emit_expr("JUMPIFEQ float_type LF@value$%i float@0x0p+0", builtin_id);
+    newline_emit_expr("JUMPIFEQ string_type LF@value$%i string@s", builtin_id);
+    newline_emit_expr("JUMPIFEQ LF@value$%i nil@nil", builtin_id);
+
+    /*  If the data type is string return the value */
+    newline_emit_expr("LABEL string_type");
+    newline_emit_expr("PUSHS LF@value$%i", builtin_id);
+    newline_emit_expr("JUMP fn_end_%s", builtin_name);
+
+    /*  If the data type is integer, convert the integer to a char */
+    newline_emit_expr("LABEL int_type");
+    newline_emit_expr("DEFVAR LF@$str");
+    newline_emit_expr("INT2STR LF@$str LF@value$%i", builtin_id);
+    newline_emit_expr("PUSHS LF@$str");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
+    /* If the data type is float, convert the float to a char first */
+    newline_emit_expr("LABEL float_type");
+    newline_emit_expr("DEFVAR LF@$str");
+    newline_emit_expr("FLOAT2STR LF@$str LF@value$%i", builtin_id);
+    newline_emit_expr("PUSHS LF@$str");
+    newline_emit_expr("JUMP fn_end_%s", builtin_name);
+
+    /* If the data type is nil, print () */
+    newline_emit_expr("LABEL type_nil");
+    newline_emit_expr("PUSHS string@()");
+
+    newline_emit_expr("LABEL fn_end_%s", builtin_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
