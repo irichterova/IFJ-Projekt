@@ -11,7 +11,7 @@
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
 
-static int call_depth = 0; // Number of open parenthesis inside a function call
+static int call_depth = 0; // Number of open parentheses inside a function call
 
 // Symbols defining the table, order must match rows/columns of precedence_table
 typedef enum {
@@ -459,7 +459,7 @@ static void reduce(PSA_Stack *stack) {
  * @brief Parses a function call id ( args ), each argument recursively via parse_expr, and creates an EXPR_CALL_FUNC node
  * @param id_token Identifier token with the function name
  * @param line Line of the function name, for the node and error messages
- * @param next Where to store the first token after the closing parenthesis
+ * @param next Where to store the first token after the closing parentheses
  * @return AST node of the function call (later pushed as E in run_psa)
  */
 static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
@@ -476,14 +476,14 @@ static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
     node->data.call_fn.args = NULL;
     node->data.call_fn.argc = 0;
 
-    call_depth++; // We are entering parenthesis
+    call_depth++; // We are entering parentheses
 
     // Get the first token after (
     token_t token = get_token(EOL_OPTIONAL);
-    // ) right away means no argument
+    // ) right away means no arguments
     if (token.type != TOKEN_R_PARENTH) {
         while (1) {
-            // Either , or )
+            // Parse one argument that ends on , or )
             expr_struct *arg = parse_expr(token, &token);
             // Realloc basically acts as a malloc too
             expr_struct **tmp = realloc(node->data.call_fn.args, (node->data.call_fn.argc + 1) * sizeof(expr_struct *));
@@ -571,6 +571,22 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
             }
             line = get_line_number();
             sym = token2symbol(token, prev, depth);
+            if (prev == PSA_ID && item.item_token.type == TOKEN_IDENTIFIER && sym == PSA_LEFT_P) {
+                // Entering a function call
+                pop_item(&stack); // Pop i
+                pop_item(&stack); // Pop <
+
+                // Parse the whole node into an AST node
+                expr_struct *call = parse_call(item.item_token, item.line, &token);
+
+                // Make a temp item and push it
+                Stack_Item temp_item = {.item_symbol = PSA_E, .line = item.line, .subtree = call};
+                push_item(&stack, temp_item);
+
+                prev = PSA_RIGHT_P;
+                line = get_line_number();
+                sym = token2symbol(token, prev, depth);
+            }
             break;
 
         case PSA_REL_REDUCE:
