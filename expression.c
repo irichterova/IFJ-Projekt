@@ -447,6 +447,96 @@ static void reduce(PSA_Stack *stack) {
 }
 
 /**
+ * @brief The main loop of precedence analysis, called by the two main functions based on token count
+ * @param first Starting token of expression
+ * @param second Second token of expression, already loaded
+ * @param has_second True/false if we load second token that we were given instead of calling a new token directly
+ * @param next Pointer to next token, we store it there
+ * @return AST node
+ */
+static expr_struct *run_psa(token_t first, token_t second, int has_second, token_t *next) {
+    // First we init stack and push first $
+
+    PSA_Stack stack;
+    init_stack(&stack);
+
+    Stack_Item start_item = {.item_symbol = PSA_START_END};
+    push_item(&stack, start_item);
+
+    token_t token = first;            // Current working token
+    token.after_eol = false;
+    psa_symbol prev = PSA_START_END;    // Previous symbol
+    int depth = 0;                      // Tracks the number of open parentheses
+    int line = get_line_number();
+
+    psa_symbol sym = token2symbol(token, prev, depth);
+    int second_token_pending = has_second; // Set to 0 after used
+
+    // Main loop
+    while(1) {
+        int t = top_terminal(&stack);
+        psa_symbol top_sym = stack.stack_items[t].item_symbol;
+
+        // End condition [$, $]
+        if (top_sym == PSA_START_END && sym == PSA_START_END) {
+            break;
+        }
+
+        Stack_Item item;
+        switch (precedence_table[top_sym][sym]) {
+        case PSA_REL_SHIFT:
+            insert_stop(&stack);
+            /* Fallthrough */
+        case PSA_REL_PUSH:
+            item = (Stack_Item){.item_symbol = sym, .item_token = token, .line = line};
+            push_item(&stack, item);
+
+            // Update parentheses depth
+            if (sym == PSA_LEFT_P) {
+                depth++;
+            } else if (sym == PSA_RIGHT_P) {
+                depth--;
+            }
+            // Save current symbol and get a new token and convert it
+            prev = sym;
+            if (second_token_pending) {
+                second_token_pending = 0;
+                token = second;
+                token.after_eol = false;
+            } else {
+                token = get_token(EOL_OPTIONAL);
+            }
+            line = get_line_number();
+            sym = token2symbol(token, prev, depth);
+            break;
+
+        case PSA_REL_REDUCE:
+            reduce(&stack);
+            break;
+        case PSA_REL_ERROR:
+            error_exit(ERR_SYN, line, "Incorrect expression syntax!");
+            break;
+        
+        default:
+            error_exit(ERR_SYN, line, "Relation somehow not in precedence table?");
+            break;
+        }
+    }
+
+    // Save the tree
+    Stack_Item final_item = pop_item(&stack);
+    if (final_item.item_symbol != PSA_E) {
+        error_exit(ERR_SYN, line, "Incorrect expression structure!");
+    }
+
+    expr_struct* root = final_item.subtree;
+
+    *next = token;
+    free_stack(&stack);
+    return root;
+}
+
+/**
  * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
  * @param first First token
  * @param next Where to store the following token
