@@ -651,12 +651,33 @@ void read_int()
     newline_emit_expr("DEFVAR LF@$type");
     newline_emit_expr("TYPE LF@$type LF@$val");
 
-    newline_emit_expr("JUMPIFEQ int_err string@nil");
+    newline_emit_expr("JUMPIFEQ int_err LF@$type string@nil");
     newline_emit_expr("PUSHS LF@$val");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
 
     newline_emit_expr("LABEL int_err");
     newline_emit_expr("PUSHS int@0");
+
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+void read_double()
+{
+    char *builtin_name = "$builtin_readdouble";
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@$val");
+    newline_emit_expr("READ LF@$val float");
+    newline_emit_expr("DEFVAR LF@$type");
+    newline_emit_expr("TYPE LF@$type LF@$val");
+
+    newline_emit_expr("JUMPIFEQ float_err LF@$type string@nil");
+    newline_emit_expr("PUSHS LF@$val");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
+    newline_emit_expr("LABEL float_err");
+    newline_emit_expr("PUSHS float@0x0p+0");
 
     newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
