@@ -10,6 +10,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Global counter for cycles (if, while) */
 static int cycle_counter = 0;
@@ -523,9 +524,52 @@ void str_len()
     newline_emit_expr("DEFVAR LF@str$%i", builtin_id);
     newline_emit_expr("POPS LF@str$%i", builtin_id);
     newline_emit_expr("DEFVAR LF@$len");
-    newline_emit_expr("STRLEN LF@$len LF$str$%i", builtin_id);
+    newline_emit_expr("STRLEN LF@$len LF@str$%i", builtin_id);
     newline_emit_expr("PUSHS LF@$len");
     newline_emit_expr("POPFRAME");
-    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
 }
-
+void chr()
+{
+    char *builtin_name = "$builtin_chr";
+    int builtin_id = 0;
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
+    newline_emit_expr("POPS LF@value$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@$char");
+    newline_emit_expr("INT2STR LF@$char LF@value$%i", builtin_id);
+    newline_emit_expr("PUSHS LF@$char");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+void ord()
+{
+    char *builtin_name = "$builtin_ord";
+    int builtin_id = 0;
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@str$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@idx$%i", builtin_id);
+    newline_emit_expr("POPS LF@str$%i", builtin_id);
+    newline_emit_expr("POPS LF@idx$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@$value");
+    newline_emit_expr("STRI2INT LF@$value LF@str$%i LF@idx$%i", builtin_id, builtin_id);
+    newline_emit_expr("PUSHS LF@$value");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+void to_int()
+{
+    char *builtin_name = "$builtin_toint";
+    int builtin_id = 0;
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
+    newline_emit_expr("POPS LF@value$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@$float");
+    newline_emit_expr("FLOAT2INT LF@$float LF@value$%i", builtin_id);
+    newline_emit_expr("PUSHS LF@$float");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
