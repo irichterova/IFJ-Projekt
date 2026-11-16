@@ -196,7 +196,20 @@ static void check_expression(expr_struct *expr) {
 static void check_command(statement_struct *command) {
     attributes attr = {0};
     insert_status status;
+    attributes *id_attr;
     switch (command->stmt_type) {
+    case STMT_ASSIGN:
+        check_expression(command->data.id_stmt.assign_expr);
+        id_attr = search_variable(command->data.id_stmt.id_name);
+        if (id_attr == NULL) {
+            error_exit(ERR_SEM_NDEF, command->line, "Variable '%s' is not defined!",
+                       command->data.id_stmt.id_name);
+        } else if (id_attr->value_modif == nonmodif_val) {
+            error_exit(ERR_SEM_NVAL, command->line, "Variable '%s' cannot be modified!",
+                       command->data.id_stmt.id_name);
+        }
+        command->data.id_stmt.codegen_id = id_attr->codegen_id;
+        break;
     case STMT_VAL:
     case STMT_VAR:
         check_expression(command->data.var_stmt.init_expr);
