@@ -11,6 +11,8 @@
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
 
+static int call_depth = 0; // Number of open parentheses inside a function call
+
 // Symbols defining the table, order must match rows/columns of precedence_table
 typedef enum {
     PSA_UNARY_MINUS, // ~
@@ -77,7 +79,7 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
  */
 static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
     // EOL outside parentheses means end of expression
-    if (token.after_eol && depth == 0) {
+    if (token.after_eol && depth == 0 && call_depth == 0) {
         return PSA_START_END;
     }
 
@@ -433,6 +435,13 @@ static void reduce(PSA_Stack *stack) {
         node->data.binary_op.right_operand = handle[0].subtree;
         node->result_type = TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
     }
+
+    // E -> () special Unit rule
+    else if (count == 2 && handle[1].item_symbol == PSA_LEFT_P && handle[0].item_symbol == PSA_RIGHT_P) {
+        line = handle[1].line;
+        node->node_type = EXPR_LIT_UNIT;
+        node->result_type = TYPE_UNIT;
+    }
     
     else {
         error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
@@ -447,93 +456,68 @@ static void reduce(PSA_Stack *stack) {
 }
 
 /**
- * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
- * @param first First token
- * @param next Where to store the following token
- * @return Pointer to the root of the expression tree
+ * @brief Parses a function call id ( args ), each argument recursively via parse_expr, and creates an EXPR_CALL_FUNC node
+ * @param id_token Identifier token with the function name
+ * @param line Line of the function name, for the node and error messages
+ * @param next Where to store the first token after the closing parentheses
+ * @return AST node of the function call (later pushed as E in run_psa)
  */
-expr_struct *parse_expr(token_t first, token_t *next) {
-    // First we init stack and push first $
+static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
+    expr_struct *node = malloc(sizeof(expr_struct));
+    if (node == NULL) {
+        error_exit(ERR_INTERNAL, line, "Failed to malloc memory for a node in parse_call!");
+    }
 
-    PSA_Stack stack;
-    init_stack(&stack);
+    node->node_type = EXPR_CALL_FUNC;
+    node->line = line;
+    node->result_type = TYPE_UNKNOWN;
 
-    Stack_Item start_item = {.item_symbol = PSA_START_END};
-    push_item(&stack, start_item);
+    node->data.call_fn.name = id_token.data.id;
+    node->data.call_fn.args = NULL;
+    node->data.call_fn.argc = 0;
 
-    token_t token = first;              // Current working token
-    psa_symbol prev = PSA_START_END;    // Previous symbol
-    int depth = 0;                      // Tracks the number of open parentheses
-    int line = get_line_number();
+    call_depth++; // We are entering parentheses
 
-    psa_symbol sym = token2symbol(token, prev, depth);
-
-    // Main loop
-    while(1) {
-        int t = top_terminal(&stack);
-        psa_symbol top_sym = stack.stack_items[t].item_symbol;
-
-        // End condition [$, $]
-        if (top_sym == PSA_START_END && sym == PSA_START_END) {
-            break;
-        }
-
-        Stack_Item item;
-        switch (precedence_table[top_sym][sym]) {
-        case PSA_REL_SHIFT:
-            insert_stop(&stack);
-            /* Fallthrough */
-        case PSA_REL_PUSH:
-            item = (Stack_Item){.item_symbol = sym, .item_token = token, .line = line};
-            push_item(&stack, item);
-
-            // Update parentheses depth
-            if (sym == PSA_LEFT_P) {
-                depth++;
-            } else if (sym == PSA_RIGHT_P) {
-                depth--;
+    // Get the first token after (
+    token_t token = get_token(EOL_OPTIONAL);
+    // ) right away means no arguments
+    if (token.type != TOKEN_R_PARENTH) {
+        while (1) {
+            // Parse one argument that ends on , or )
+            expr_struct *arg = parse_expr(token, &token);
+            // Realloc basically acts as a malloc too
+            expr_struct **tmp = realloc(node->data.call_fn.args, (node->data.call_fn.argc + 1) * sizeof(expr_struct *));
+            if (tmp == NULL) {
+                error_exit(ERR_INTERNAL, line, "Couldn't allocate memory to a new argument in parse_call!");
             }
-            // Save current symbol and get a new token and convert it
-            prev = sym;
-            token = get_token(EOL_OPTIONAL);
-            line = get_line_number();
-            sym = token2symbol(token, prev, depth);
-            break;
+            node->data.call_fn.args = tmp;
+            node->data.call_fn.args[node->data.call_fn.argc] = arg;
+            node->data.call_fn.argc++;
 
-        case PSA_REL_REDUCE:
-            reduce(&stack);
-            break;
-        case PSA_REL_ERROR:
-            error_exit(ERR_SYN, line, "Incorrect expression syntax!");
-            break;
-        
-        default:
-            error_exit(ERR_SYN, line, "Relation somehow not in precedence table?");
-            break;
+            if (token.type == TOKEN_COMMA) {
+                token = get_token(EOL_OPTIONAL);
+                continue;
+            } else if (token.type == TOKEN_R_PARENTH) {
+                break;
+            } else {
+                error_exit(ERR_SYN, line, "Wrong function arguments grammar!");
+            }
         }
     }
-
-    // Save the tree
-    Stack_Item final_item = pop_item(&stack);
-    if (final_item.item_symbol != PSA_E) {
-        error_exit(ERR_SYN, line, "Incorrect expression structure!");
-    }
-
-    expr_struct* root = final_item.subtree;
-
-    *next = token;
-    free_stack(&stack);
-    return root;
+    call_depth--; // We left a pair of parentheses
+    *next = get_token(EOL_OPTIONAL);
+    return node;
 }
 
 /**
- * @brief Parses an expression (expr_rest), creates its tree, stores following token
- * @param first First token
- * @param second Second token
- * @param next Where to store the following token
- * @return Pointer to the root of the expression tree
+ * @brief The main loop of precedence analysis, called by the two main functions based on token count
+ * @param first Starting token of expression
+ * @param second Second token of expression, already loaded
+ * @param has_second True/false if we load second token that we were given instead of calling a new token directly
+ * @param next Pointer to next token, we store it there
+ * @return AST node
  */
-expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
+static expr_struct *run_psa(token_t first, token_t second, int has_second, token_t *next) {
     // First we init stack and push first $
 
     PSA_Stack stack;
@@ -543,12 +527,13 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     push_item(&stack, start_item);
 
     token_t token = first;              // Current working token
+    token.after_eol = false;            // Newline from tokens from parser is ignored
     psa_symbol prev = PSA_START_END;    // Previous symbol
     int depth = 0;                      // Tracks the number of open parentheses
     int line = get_line_number();
 
     psa_symbol sym = token2symbol(token, prev, depth);
-    int second_token_pending = 1; // Set to 0 after used
+    int second_token_pending = has_second; // Set to 0 after used
 
     // Main loop
     while(1) {
@@ -585,6 +570,22 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
             }
             line = get_line_number();
             sym = token2symbol(token, prev, depth);
+            if (prev == PSA_ID && item.item_token.type == TOKEN_IDENTIFIER && sym == PSA_LEFT_P) {
+                // Entering a function call
+                pop_item(&stack); // Pop i
+                pop_item(&stack); // Pop <
+
+                // Parse the whole node into an AST node
+                expr_struct *call = parse_call(item.item_token, item.line, &token);
+
+                // Make a temp item and push it
+                Stack_Item temp_item = {.item_symbol = PSA_E, .line = item.line, .subtree = call};
+                push_item(&stack, temp_item);
+
+                prev = PSA_RIGHT_P;
+                line = get_line_number();
+                sym = token2symbol(token, prev, depth);
+            }
             break;
 
         case PSA_REL_REDUCE:
@@ -611,4 +612,27 @@ expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
     *next = token;
     free_stack(&stack);
     return root;
+}
+
+/**
+ * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
+ * @param first First token
+ * @param next Where to store the following token
+ * @return Pointer to the root of the expression tree
+ */
+expr_struct *parse_expr(token_t first, token_t *next) {
+    // When we only know one token, disable the second
+    return run_psa(first, first, 0, next);
+}
+
+/**
+ * @brief Parses an expression (expr_rest), creates its tree, stores following token
+ * @param first First token
+ * @param second Second token
+ * @param next Where to store the following token
+ * @return Pointer to the root of the expression tree
+ */
+expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next) {
+    // When we get a second token as well, use it instead of asking for a new one
+    return run_psa(first, second, 1, next);
 }

@@ -23,5 +23,8 @@ expression.o : expression.c expression.h ast.h scanner.h
 clean:
 	del /f generator.exe generator.o vystup.code 2>nul || exit 0
 
+clean-all:
+	rm -f *.o
+
 clean-expr:
 	rm -f expression.o

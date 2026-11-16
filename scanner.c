@@ -14,6 +14,9 @@
 #include "buffer.h"
 #include "error.h"
 
+/**
+ * @brief States of the finite state machine used by the scanner
+ */
 enum states {
     S_START,
     S_GT,
@@ -66,9 +69,24 @@ char* keywords_arr[] = {
     "var",
     "while",
     "Boolean",
+    "for",
 };
 
-static int line_count = 1;
+static int line_count = 1;  //Keeps track of the current line number
+
+/**
+ * @brief Reads the next symbol to be processed
+ * @param pending_symbol Pointer to the symbol waiting to be processed
+ * @return Pending symbol if there's one; symbol from stdin otherwise
+ */
+int read_symbol (int* pending_symbol) {
+    if (*pending_symbol != -1) {
+        int symbol = *pending_symbol;
+        *pending_symbol = -1;
+        return symbol;
+    }
+    return getchar();
+}
 
 /**
  * @brief Checks if the identifier is a keyword
@@ -88,28 +106,26 @@ int compare_with_keywords (char* identifier) {
 /**
  * @brief Converts the string to integer 
  * @param string String ending with '\0' to be converted to integer
- * @return Converted integer value if the conversion was successful
+ * @return Converted integer value if the conversion was successful; -1 otherwise
  */
 int convert_str2int (char* string) {
     errno = 0;
     char* endptr;
     long long number = strtoll(string, &endptr, 10);
     if (*endptr == '\0' && errno == 0 && number <= INT_MAX) return number;
-    error_exit(1, line_count, "Invalid number");
     return -1;
 }
 
 /**
  * @brief Converts the string to double
  * @param string String ending with '\0'to be converted to double
- * @return Converted double value if the conversion was successful
+ * @return Converted double value if the conversion was successful; -1 otherwise
  */
 double convert_str2dbl (char* string) {
     errno = 0;
     char* endptr;
     double number = strtod(string, &endptr);
     if (*endptr == '\0' && errno == 0) return number;
-    error_exit(1, line_count, "Invalid number");
     return -1;
 }
 
@@ -129,14 +145,15 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
  * @param line_indent Pointer to the variable storing the current indentation level
  * @param symbol Character read from stdin 
  * @param tab_at_beginning Pointer to a flag indicating the presence of a tab at the beginning of the physical line
+ * @param pending_symbol Pointer to the symbol waiting to be processed
  */
-void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning) {
+void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning, int* pending_symbol) {
     *line_indent = 0; // indentation measurement starts at 0
 
     while (symbol == ' ' || symbol == '\r' || symbol == '\t') {
         if (symbol == ' ') (*line_indent)++;
         else if (symbol == '\t') *tab_at_beginning = true;
-        symbol = getchar();
+        symbol = read_symbol(pending_symbol);
     }
 
     if (symbol != EOF) ungetc(symbol, stdin);
@@ -148,10 +165,11 @@ void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning) 
  * @param indent_stack Pointer to the stack storing indentation levels
  * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
  * @param symbol Last read character to be returned to stdin
+ * @param pending_symbol Pointer to the symbol waiting to be processed
  * @note A line_indent value of -1 indicates that the line indentation has already been processed 
  */
-void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol) {
-    ungetc(symbol, stdin);
+void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, int* pending_symbol) {
+    *pending_symbol = symbol; 
     if (*line_indent > stack_top(indent_stack)) {
         stack_push(indent_stack, *line_indent);
         token->type = TOKEN_INDENT;
@@ -173,12 +191,13 @@ void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* toke
  * @param indent_stack Pointer to the stack storing indentation levels
  * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
  * @param symbol Last read character to be returned to stdin
+ * @param pending_symbol Pointer to the symbol waiting to be processed
  * @param tab_at_beginning Flag indicating the presence of a tab at the beginning of the physical line
  * @param logical_line_cont Indicates whether the current line is a continuation of a logical line
  * @return true if the indentation stack was updated and the token needs to be returned; false otherwise
  * @note A line_indent value of -1 indicates that the line indentation has already been processed 
  */
-bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, 
+bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, int* pending_symbol,
     bool tab_at_beginning, bool logical_line_cont) {
         
     if (tab_at_beginning) error_exit(1, line_count, "Tab can not be at the beginning of a non-empty line");
@@ -190,7 +209,7 @@ bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token
     }
     if (!logical_line_cont) {
         if (*line_indent != stack_top(indent_stack)) {
-            update_indent_stack(line_indent, indent_stack, token, symbol);
+            update_indent_stack(line_indent, indent_stack, token, symbol, pending_symbol);
             return true;
         }
         else *line_indent = -1;
@@ -204,6 +223,7 @@ int get_line_number () {
 
 token_t get_token (enum eol_rules rule) {
     int symbol;
+    static int pending_symbol = -1;
     token_t token = {0};
     enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
@@ -220,7 +240,7 @@ token_t get_token (enum eol_rules rule) {
     static bool tab_at_beginning = false;
     
     while (1) {
-        symbol = getchar();
+        symbol = read_symbol(&pending_symbol);
         switch (state) {
             case S_START:
                 if (!stack_initialized) {
@@ -230,7 +250,7 @@ token_t get_token (enum eol_rules rule) {
                 }
 
                 if (line_indent == -2) {
-                    measure_indentation(&line_indent, symbol, &tab_at_beginning);
+                    measure_indentation(&line_indent, symbol, &tab_at_beginning, &pending_symbol);
                     break;
                 }
 
@@ -255,6 +275,10 @@ token_t get_token (enum eol_rules rule) {
                         token.after_eol = eol_before_token;
                         return token;
                     }
+                    if (stack_initialized) {
+                        stack_destruct(&indent_stack);
+                        stack_initialized = false;
+                    }
                     token.type = TOKEN_EOF;
                     token.after_eol = eol_before_token;
                     return token;
@@ -267,7 +291,8 @@ token_t get_token (enum eol_rules rule) {
                 check_eol_rule(eol_before_token, rule);
 
                 if (line_indent >= 0) {
-                    if (handle_indentation (&line_indent, &indent_stack, &token, symbol, tab_at_beginning, logical_line_cont)) {
+                    if (handle_indentation (&line_indent, &indent_stack, &token, symbol, &pending_symbol,
+                        tab_at_beginning, logical_line_cont)) {
                         token.after_eol = eol_before_token;
                         return token;
                     }
@@ -369,6 +394,11 @@ token_t get_token (enum eol_rules rule) {
                     token.after_eol = eol_before_token;
                     return token;
                 }
+                else if (symbol == '-') {
+                    token.type = TOKEN_GENERATOR_ARROW;
+                    token.after_eol = eol_before_token;
+                    return token;
+                }
                 else if (symbol != EOF) {
                     ungetc(symbol, stdin);
                 }
@@ -378,6 +408,11 @@ token_t get_token (enum eol_rules rule) {
             case S_ASSIGN:
                 if (symbol == '=') {
                     token.type = TOKEN_OP_EQ;
+                    token.after_eol = eol_before_token;
+                    return token;
+                }
+                else if (symbol == '>') {
+                    token.type = TOKEN_FUNCTION_ARROW;
                     token.after_eol = eol_before_token;
                     return token;
                 }
@@ -487,8 +522,9 @@ token_t get_token (enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_INT_LITERAL;
                 token.data.int_value = convert_str2int(number_buffer.data);
-                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
+                if (token.data.int_value == -1) error_exit(1, line_count, "Invalid number");
+                token.after_eol = eol_before_token;
                 return token;
             case S_INT_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
@@ -583,8 +619,9 @@ token_t get_token (enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_DBL_LITERAL;
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
-                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
+                if (token.data.dbl_value == -1) error_exit(1, line_count, "Invalid number");
+                token.after_eol = eol_before_token;
                 return token;
             case S_DBL_DECIMAL_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
@@ -635,8 +672,9 @@ token_t get_token (enum eol_rules rule) {
                 add_symbol2buffer(&number_buffer, '\0');
                 token.type = TOKEN_DBL_LITERAL;
                 token.data.dbl_value = convert_str2dbl(number_buffer.data);
-                token.after_eol = eol_before_token;
                 buffer_destruct(&number_buffer);
+                if (token.data.dbl_value == -1) error_exit(1, line_count, "Invalid number");
+                token.after_eol = eol_before_token;
                 return token;
             case S_DBL_EXP_UNDERSCORE:
                 if (symbol >= '0' && symbol <= '9') {
@@ -779,7 +817,8 @@ token_t get_token (enum eol_rules rule) {
                 }
                 check_eol_rule(eol_before_token, rule);
                 if (line_indent >= 0) {
-                    if (handle_indentation (&line_indent, &indent_stack, &token, '/', tab_at_beginning, logical_line_cont)) {
+                    if (handle_indentation (&line_indent, &indent_stack, &token, '/', &pending_symbol,
+                        tab_at_beginning, logical_line_cont)) {
                         token.after_eol = eol_before_token;
                         return token;
                     }
