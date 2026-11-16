@@ -12,10 +12,34 @@
  * @param expr struct of freed expression
  */
 static void free_expr(expr_struct *expr) {
-    // TODO: free expression with PSA
     if (expr == NULL) {
         return;
     }
+    switch (expr->node_type){
+        case EXPR_LIT_STRING:
+            free(expr->data.lit_string);
+            break;
+        case EXPR_VARIABLE:
+            free(expr->data.variable.id_name);
+            break;
+        case EXPR_CALL_FUNC:
+            for(int idx = 0; idx < expr->data.call_fn.argc; idx++){
+                free_expr(expr->data.call_fn.args[idx]);
+            }
+            free(expr->data.call_fn.args);
+            free(expr->data.call_fn.name);
+            break;
+        case EXPR_BIN_OP:
+            free_expr(expr->data.binary_op.left_operand);
+            free_expr(expr->data.binary_op.right_operand);
+            break;
+        case EXPR_UNA_OP:
+            free_expr(expr->data.unary_op.operand);
+            break;
+        default:
+            break;
+    }
+    free(expr);
 }
 
 /**
