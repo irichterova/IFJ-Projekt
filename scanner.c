@@ -71,6 +71,15 @@ char* keywords_arr[] = {
 
 static int line_count = 1;
 
+int read_symbol (int* pending_symbol) {
+    if (*pending_symbol != -1) {
+        int symbol = *pending_symbol;
+        *pending_symbol = -1;
+        return symbol;
+    }
+    return getchar();
+}
+
 /**
  * @brief Checks if the identifier is a keyword
  * @param identifier String ending with '\0' representing the identifier to be checked
@@ -131,13 +140,13 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
  * @param symbol Character read from stdin 
  * @param tab_at_beginning Pointer to a flag indicating the presence of a tab at the beginning of the physical line
  */
-void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning) {
+void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning, int* pending_symbol) {
     *line_indent = 0; // indentation measurement starts at 0
 
     while (symbol == ' ' || symbol == '\r' || symbol == '\t') {
         if (symbol == ' ') (*line_indent)++;
         else if (symbol == '\t') *tab_at_beginning = true;
-        symbol = getchar();
+        symbol = read_symbol(pending_symbol);
     }
 
     if (symbol != EOF) ungetc(symbol, stdin);
@@ -151,8 +160,8 @@ void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning) 
  * @param symbol Last read character to be returned to stdin
  * @note A line_indent value of -1 indicates that the line indentation has already been processed 
  */
-void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol) {
-    ungetc(symbol, stdin);
+void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, int* pending_symbol) {
+    *pending_symbol = symbol; 
     if (*line_indent > stack_top(indent_stack)) {
         stack_push(indent_stack, *line_indent);
         token->type = TOKEN_INDENT;
@@ -179,7 +188,7 @@ void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* toke
  * @return true if the indentation stack was updated and the token needs to be returned; false otherwise
  * @note A line_indent value of -1 indicates that the line indentation has already been processed 
  */
-bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, 
+bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, int* pending_symbol,
     bool tab_at_beginning, bool logical_line_cont) {
         
     if (tab_at_beginning) error_exit(1, line_count, "Tab can not be at the beginning of a non-empty line");
@@ -191,7 +200,7 @@ bool handle_indentation (int* line_indent, stack_t* indent_stack, token_t* token
     }
     if (!logical_line_cont) {
         if (*line_indent != stack_top(indent_stack)) {
-            update_indent_stack(line_indent, indent_stack, token, symbol);
+            update_indent_stack(line_indent, indent_stack, token, symbol, pending_symbol);
             return true;
         }
         else *line_indent = -1;
@@ -205,6 +214,7 @@ int get_line_number () {
 
 token_t get_token (enum eol_rules rule) {
     int symbol;
+    static int pending_symbol = -1;
     token_t token = {0};
     enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
@@ -221,7 +231,7 @@ token_t get_token (enum eol_rules rule) {
     static bool tab_at_beginning = false;
     
     while (1) {
-        symbol = getchar();
+        symbol = read_symbol(&pending_symbol);
         switch (state) {
             case S_START:
                 if (!stack_initialized) {
@@ -231,7 +241,7 @@ token_t get_token (enum eol_rules rule) {
                 }
 
                 if (line_indent == -2) {
-                    measure_indentation(&line_indent, symbol, &tab_at_beginning);
+                    measure_indentation(&line_indent, symbol, &tab_at_beginning, &pending_symbol);
                     break;
                 }
 
@@ -268,7 +278,8 @@ token_t get_token (enum eol_rules rule) {
                 check_eol_rule(eol_before_token, rule);
 
                 if (line_indent >= 0) {
-                    if (handle_indentation (&line_indent, &indent_stack, &token, symbol, tab_at_beginning, logical_line_cont)) {
+                    if (handle_indentation (&line_indent, &indent_stack, &token, symbol, &pending_symbol,
+                        tab_at_beginning, logical_line_cont)) {
                         token.after_eol = eol_before_token;
                         return token;
                     }
@@ -790,7 +801,8 @@ token_t get_token (enum eol_rules rule) {
                 }
                 check_eol_rule(eol_before_token, rule);
                 if (line_indent >= 0) {
-                    if (handle_indentation (&line_indent, &indent_stack, &token, '/', tab_at_beginning, logical_line_cont)) {
+                    if (handle_indentation (&line_indent, &indent_stack, &token, '/', &pending_symbol,
+                        tab_at_beginning, logical_line_cont)) {
                         token.after_eol = eol_before_token;
                         return token;
                     }
