@@ -353,6 +353,13 @@ static void check_expression(expr_struct *expr) {
         }
         for (int hdx = 0; hdx < expr->data.call_fn.argc; hdx++) {
             check_expression(expr->data.call_fn.args[hdx]);
+            if (expr_attr->param_type_array[hdx] != any_dt) {
+                value_type val_type = convert_param2value(expr_attr->param_type_array[hdx]);
+                if (!compatible_type(val_type, expr->data.call_fn.args[hdx]->result_type)) {
+                    error_exit(ERR_SEM_ARG, expr->line,
+                               "Argument is not compatible with parameter type!");
+                }
+            }
         }
         if (expr_attr->ret_state == ret_inferred) {
             expr->result_type = convert_param2value(expr_attr->return_type);
