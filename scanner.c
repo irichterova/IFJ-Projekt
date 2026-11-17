@@ -47,6 +47,7 @@ enum states {
     S_MULTI_LN_STR,
     S_MULTI_LN_STR_END1,
     S_MULTI_LN_STR_END2,
+    S_MULTI_LN_STR_END3,
     S_LINE_COM,
     S_BLOCK_COM,
     S_BLOCK_COM_END,
@@ -228,7 +229,6 @@ token_t get_token(enum eol_rules rule) {
     token_t token;
     enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
-    bool empty_string = true;
     bool eol_before_token = false;
 
     int unended_com_cnt = 0;
@@ -655,23 +655,13 @@ token_t get_token(enum eol_rules rule) {
             break;
         case S_STR:
             if (symbol == '\\') {
-                empty_string = false;
                 state = S_ESC_SEQ;
             } else if (symbol == '"') {
-                if (!empty_string) {
-                    add_symbol2buffer(&string_buffer, '\0');
-                    token.type = TOKEN_STR_LITERAL;
-                    token.data.str_value = string_buffer.data;
-                    token.after_eol = eol_before_token;
-                    return token;
-                } else {
-                    state = S_STR_END;
-                }
+                state = S_STR_END;
             } else if (symbol == '\n' || symbol == EOF) {
                 buffer_destruct(&string_buffer);
                 error_exit(1, line_count, "String not ended correctly");
             } else {
-                empty_string = false;
                 add_symbol2buffer(&string_buffer, symbol);
             }
             break;
@@ -743,11 +733,7 @@ token_t get_token(enum eol_rules rule) {
             break;
         case S_MULTI_LN_STR_END2:
             if (symbol == '"') {
-                add_symbol2buffer(&string_buffer, '\0');
-                token.type = TOKEN_STR_LITERAL;
-                token.data.str_value = string_buffer.data;
-                token.after_eol = eol_before_token;
-                return token;
+                state = S_MULTI_LN_STR_END3;
             } else if (symbol != EOF) {
                 if (symbol == '\n')
                     line_count++;
@@ -760,6 +746,15 @@ token_t get_token(enum eol_rules rule) {
                 error_exit(1, line_count, "String not ended correctly");
             }
             break;
+        case S_MULTI_LN_STR_END3:
+            if (symbol != EOF) {
+                ungetc(symbol, stdin);
+            }
+            add_symbol2buffer(&string_buffer, '\0');
+            token.type = TOKEN_STR_LITERAL;
+            token.data.str_value = string_buffer.data;
+            token.after_eol = eol_before_token;
+            return token;
         case S_DIV:
             if (symbol == '/') {
                 state = S_LINE_COM;
@@ -840,10 +835,8 @@ token_t get_token(enum eol_rules rule) {
         case S_NESTED_COM:
             if (symbol == '*') {
                 unended_com_cnt++;
-                state = S_BLOCK_COM;
-                break;
             }
-            if (symbol == '/')
+            else if (symbol == '/')
                 break;
             else if (symbol == EOF) {
                 error_exit(1, line_count, "Block comment ended incorrectly");
