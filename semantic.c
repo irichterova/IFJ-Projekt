@@ -367,6 +367,17 @@ static void check_expression(expr_struct *expr) {
 }
 
 /**
+ * @brief checks semantic analysis of condition in while or if statement
+ * @param expr struct of condition
+ */
+static void check_condition(expr_struct *expr) {
+    check_expression(expr);
+    if (expr->result_type != TYPE_BOOL) {
+        error_exit(ERR_SEM_TYPE, expr->line, "Result type of condition is not Boolean!");
+    }
+}
+
+/**
  * @brief checks semantic analysis of commands
  * @param command struct with statement command
  */
@@ -452,12 +463,12 @@ static void check_command(statement_struct *command) {
         check_expression(command->data.expr_stmt);
         break;
     case STMT_IF:
-        check_expression(command->data.if_stmt.if_expr);
+        check_condition(command->data.if_stmt.if_expr);
         check_block(command->data.if_stmt.then_stmt);
         check_block(command->data.if_stmt.else_stmt);
         break;
     case STMT_WHILE:
-        check_expression(command->data.while_lp.while_expr);
+        check_condition(command->data.while_lp.while_expr);
         check_block(command->data.while_lp.while_body);
         break;
     }
