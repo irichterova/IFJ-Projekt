@@ -134,6 +134,7 @@ static void insert_builtin_funcs(void) {
         attr.param_type_array = (param_type *)funcs[idx].p_type;
         attr.builtin_flag = true;
         attr.symbol = function;
+        attr.ret_state = ret_inferred;
         insert_status status = insert_hash(func_hash, funcs[idx].func_name, &attr);
         if (status != insert_ok) {
             error_exit(ERR_INTERNAL, 0, "Insert hashtable failed!");
@@ -316,6 +317,21 @@ static void check_expression(expr_struct *expr) {
         break;
     case EXPR_UNA_OP:
         check_expression(expr->data.unary_op.operand);
+        if (expr->data.unary_op.op_type == OP_UNA_MINUS) {
+            if (is_int_or_double(expr->data.unary_op.operand->result_type)) {
+                expr->result_type = expr->data.unary_op.operand->result_type;
+            } else {
+                error_exit(ERR_SEM_TYPE, expr->line, "Operand is not numeric!");
+            }
+        } else if (expr->data.unary_op.op_type == OP_NOT) {
+            if (expr->data.unary_op.operand->result_type == TYPE_BOOL) {
+                expr->result_type = TYPE_BOOL;
+            } else {
+                error_exit(ERR_SEM_TYPE, expr->line, "Operand is not boolean!");
+            }
+        } else {
+            error_exit(ERR_INTERNAL, expr->line, "Type of unary operator doesn't match!");
+        }
         break;
     case EXPR_BIN_OP:
         check_expression(expr->data.binary_op.left_operand);
@@ -337,6 +353,12 @@ static void check_expression(expr_struct *expr) {
         }
         for (int hdx = 0; hdx < expr->data.call_fn.argc; hdx++) {
             check_expression(expr->data.call_fn.args[hdx]);
+        }
+        if (expr_attr->ret_state == ret_inferred) {
+            expr->result_type = convert_param2value(expr_attr->return_type);
+        } else {
+            // TODO: fixed in return types
+            expr->result_type = TYPE_UNKNOWN;
         }
         break;
     default:
