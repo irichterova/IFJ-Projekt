@@ -40,7 +40,7 @@ static const builtin_func funcs[] = {{"print", 1, {any_dt}, unit_dt},
  * @param value_t type of value that is converted to param_type
  * @return returns type of param from value type
  */
-static param_type convert_type(value_type value_t) {
+static param_type convert_value2param(value_type value_t) {
     switch (value_t) {
     case TYPE_INT:
         return int_dt;
@@ -53,7 +53,30 @@ static param_type convert_type(value_type value_t) {
     case TYPE_BOOL:
         return bool_dt;
     default:
-        error_exit(ERR_INTERNAL, 0, "Cannot convert unknown type to param type!");
+        error_exit(ERR_INTERNAL, 0, "Cannot convert unknown value type to param type!");
+        return 0;
+    }
+}
+
+/**
+ * @brief converts param_type to value_type
+ * @param param_t type of param that is converted to value_type
+ * @return returns type of value from param type
+ */
+static value_type convert_param2value(param_type param_t) {
+    switch (param_t) {
+    case int_dt:
+        return TYPE_INT;
+    case double_dt:
+        return TYPE_DOUBLE;
+    case string_dt:
+        return TYPE_STRING;
+    case unit_dt:
+        return TYPE_UNIT;
+    case bool_dt:
+        return TYPE_BOOL;
+    default:
+        error_exit(ERR_INTERNAL, 0, "Cannot convert unknown param type to value type!");
         return 0;
     }
 }
@@ -131,7 +154,7 @@ static void insert_program_funcs(program_struct *program) {
         attr.main_flag = cursor->is_main;
         attr.num_of_param = cursor->param_argc;
         if (cursor->declared_ret_type != TYPE_UNKNOWN) {
-            attr.return_type = convert_type(cursor->declared_ret_type);
+            attr.return_type = convert_value2param(cursor->declared_ret_type);
             attr.ret_state = ret_inferred;
         } else {
             attr.ret_state = ret_unknown;
@@ -143,7 +166,7 @@ static void insert_program_funcs(program_struct *program) {
                 error_exit(ERR_INTERNAL, cursor->line, "Memory allocation failed!");
             }
             for (int kdx = 0; kdx < cursor->param_argc; kdx++) {
-                param[kdx] = convert_type(cursor->param_args[kdx].param_type);
+                param[kdx] = convert_value2param(cursor->param_args[kdx].param_type);
             }
             attr.param_type_array = param;
         }
@@ -187,6 +210,21 @@ static void check_block(statement_struct *statement) {
 }
 
 /**
+ * @brief checks compatibility of conversion of types
+ * @param expected type we expect
+ * @param actual type we get
+ * @return returns true if expected is same as actual or conversion is int2double, returns false if
+ * not
+ */
+static bool compatible_type(value_type expected, value_type actual) {
+    if (expected == actual || (expected == TYPE_DOUBLE && actual == TYPE_INT)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
  * @brief checks semantic analysis of expression
  * @param expr struct with expression
  */
@@ -200,6 +238,7 @@ static void check_expression(expr_struct *expr) {
                        expr->data.variable.id_name);
         }
         expr->data.variable.codegen_id = expr_attr->codegen_id;
+        expr->result_type = convert_param2value(expr_attr->data_type);
         break;
     case EXPR_UNA_OP:
         check_expression(expr->data.unary_op.operand);
@@ -259,8 +298,7 @@ static void check_command(statement_struct *command) {
             attr.value_modif = nonmodif_val;
         }
         if (command->data.var_stmt.declared_type != TYPE_UNKNOWN) {
-            // TODO: in future data_type has to have value
-            attr.data_type = convert_type(command->data.var_stmt.declared_type);
+            attr.data_type = convert_value2param(command->data.var_stmt.declared_type);
         }
         attr.codegen_id = codegen_next;
         command->data.var_stmt.codegen_id = codegen_next;
@@ -303,7 +341,7 @@ static void check_function(function_struct *func) {
         attributes attr = {0};
         attr.symbol = variable;
         attr.value_modif = nonmodif_val;
-        attr.data_type = convert_type(func->param_args[jdx].param_type);
+        attr.data_type = convert_value2param(func->param_args[jdx].param_type);
         attr.codegen_id = codegen_next;
         func->param_args[jdx].codegen_id = codegen_next;
         codegen_next++;
