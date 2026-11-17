@@ -1,7 +1,8 @@
 /**
- * Project name: Implementace překladače imperativního jazyka IFJ26
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Izabela Richterová (xrichti00)
  * @file buffer.c
+ * @brief Implements the dynamic buffer functions
  */
 
 #include <stdio.h>
@@ -9,7 +10,7 @@
 #include "buffer.h"
 
 void buffer_init (buffer_t* buffer) {
-    buffer->capacity = 10;
+    buffer->capacity = 10;      // baseline capacity
     buffer->size = 0;
     buffer->data = malloc (buffer->capacity * sizeof (char));
     if (!(buffer->data)) exit (99);

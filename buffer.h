@@ -1,7 +1,8 @@
 /**
- * Project name: Implementace překladače imperativního jazyka IFJ26
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Izabela Richterová (xrichti00)
  * @file buffer.h
+ * @brief Declares the dynamic buffer structure and its functions
  */
 
 #ifndef BUFFER_H

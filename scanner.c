@@ -1,7 +1,8 @@
 /**
- * Project name: Implementace překladače imperativního jazyka IFJ26
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Izabela Richterová (xrichti00)
  * @file scanner.c
+ * @brief Implements the scanner using finite state machine
  */
 
 #include <stdio.h>
@@ -72,7 +73,7 @@ char* keywords_arr[] = {
     "for",
 };
 
-static int line_count = 1;  //Keeps track of the current line number
+static int line_count = 1;  // keeps track of the current line number
 
 /**
  * @brief Reads the next symbol to be processed
@@ -80,7 +81,7 @@ static int line_count = 1;  //Keeps track of the current line number
  * @return Pending symbol if there's one; symbol from stdin otherwise
  */
 int read_symbol (int* pending_symbol) {
-    if (*pending_symbol != -1) {
+    if (*pending_symbol != -1) {    // -1 indicates that no symbol is pending
         int symbol = *pending_symbol;
         *pending_symbol = -1;
         return symbol;
@@ -104,7 +105,7 @@ int compare_with_keywords (char* identifier) {
 }
 
 /**
- * @brief Converts the string to integer 
+ * @brief Converts the string to an integer 
  * @param string String ending with '\0' to be converted to integer
  * @return Converted integer value if the conversion was successful; -1 otherwise
  */
@@ -117,8 +118,8 @@ int convert_str2int (char* string) {
 }
 
 /**
- * @brief Converts the string to double
- * @param string String ending with '\0'to be converted to double
+ * @brief Converts the string to a double
+ * @param string String ending with '\0' to be converted to double
  * @return Converted double value if the conversion was successful; -1 otherwise
  */
 double convert_str2dbl (char* string) {
@@ -143,7 +144,7 @@ void check_eol_rule (bool eol_before_token, enum eol_rules rule) {
 /**
  * @brief Measures the indentation at the beginning of a physical line
  * @param line_indent Pointer to the variable storing the current indentation level
- * @param symbol Character read from stdin 
+ * @param symbol Character currently being processed 
  * @param tab_at_beginning Pointer to a flag indicating the presence of a tab at the beginning of the physical line
  * @param pending_symbol Pointer to the symbol waiting to be processed
  */
@@ -164,12 +165,12 @@ void measure_indentation (int* line_indent, int symbol, bool* tab_at_beginning, 
  * @param line_indent Pointer to the variable storing the current indentation level
  * @param indent_stack Pointer to the stack storing indentation levels
  * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
- * @param symbol Last read character to be returned to stdin
+ * @param symbol Last read character to be processed again
  * @param pending_symbol Pointer to the symbol waiting to be processed
  * @note A line_indent value of -1 indicates that the line indentation has already been processed 
  */
 void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* token, int symbol, int* pending_symbol) {
-    *pending_symbol = symbol; 
+    *pending_symbol = symbol;       // save the symbol for later processing to avoid double ungetc() calls in S_DIV
     if (*line_indent > stack_top(indent_stack)) {
         stack_push(indent_stack, *line_indent);
         token->type = TOKEN_INDENT;
@@ -190,7 +191,7 @@ void update_indent_stack (int* line_indent, stack_t* indent_stack, token_t* toke
  * @param line_indent Pointer to the variable storing the current indentation level
  * @param indent_stack Pointer to the stack storing indentation levels
  * @param token Pointer to the token whose type is to be set to TOKEN_INDENT or TOKEN_DEDENT
- * @param symbol Last read character to be returned to stdin
+ * @param symbol Last read character to be processed again
  * @param pending_symbol Pointer to the symbol waiting to be processed
  * @param tab_at_beginning Flag indicating the presence of a tab at the beginning of the physical line
  * @param logical_line_cont Indicates whether the current line is a continuation of a logical line
@@ -223,14 +224,17 @@ int get_line_number () {
 
 token_t get_token (enum eol_rules rule) {
     int symbol;
-    static int pending_symbol = -1;
-    token_t token = {0};
+    static int pending_symbol = -1;      // -1 indicates that no symbol is pending
+    token_t token;
     enum states state = S_START;
     buffer_t identif_buffer, number_buffer, string_buffer;
     bool empty_string = true;
-    int unended_com_cnt = 0;
     bool eol_before_token = false;
+
+    int unended_com_cnt = 0;
     bool lf_in_comment = false;
+    bool after_block_com = false;
+
     static int unended_parenth_cnt = 0;
     bool logical_line_cont = false;
 
@@ -245,7 +249,7 @@ token_t get_token (enum eol_rules rule) {
             case S_START:
                 if (!stack_initialized) {
                     stack_init(&indent_stack);
-                    stack_push(&indent_stack, 0);
+                    stack_push(&indent_stack, 0);       // baseline indentation is 0
                     stack_initialized = true;
                 }
 
@@ -269,7 +273,7 @@ token_t get_token (enum eol_rules rule) {
                 else if (symbol == EOF) {
                     eol_before_token = true;
                     check_eol_rule(eol_before_token, rule);
-                    if (stack_top(&indent_stack) != 0) {
+                    if (stack_top(&indent_stack) != 0) {        // pop remaining indentation levels before returning EOF
                         stack_pop(&indent_stack);
                         token.type = TOKEN_DEDENT;
                         token.after_eol = eol_before_token;
@@ -464,8 +468,8 @@ token_t get_token (enum eol_rules rule) {
                     ungetc(symbol, stdin);
                 }
                 add_symbol2buffer(&identif_buffer, '\0');
-                int keyword = compare_with_keywords(identif_buffer.data);
-                if (keyword != -1) {
+                int keyword = compare_with_keywords(identif_buffer.data);     // check whether the identifier is a keyword
+                if (keyword != -1) {        // -1 indicates that no matching keyword was found
                     token.type = TOKEN_KEYWORD;
                     token.data.keyword = keyword;
                     buffer_destruct(&identif_buffer);
@@ -537,18 +541,12 @@ token_t get_token (enum eol_rules rule) {
                 }
                 break;
             case S_ZERO:
-                if (symbol == '.') {
+                if (symbol == '.' || symbol == 'e' || symbol == 'E') {
                     buffer_init(&number_buffer);
                     add_symbol2buffer(&number_buffer, '0');
                     add_symbol2buffer(&number_buffer, symbol);
-                    state = S_INT_PERIOD;
-                    break;
-                }
-                else if (symbol == 'e' || symbol == 'E') {
-                    buffer_init(&number_buffer);
-                    add_symbol2buffer(&number_buffer, '0');
-                    add_symbol2buffer(&number_buffer, symbol);
-                    state = S_EXPONENT;
+                    if (symbol == '.') state = S_INT_PERIOD;
+                    else state = S_EXPONENT;
                     break;
                 }
                 else if (symbol >= '1' && symbol <= '9') {
@@ -815,6 +813,7 @@ token_t get_token (enum eol_rules rule) {
                 else if (symbol != EOF) {
                     ungetc (symbol, stdin);
                 }
+                if (after_block_com) error_exit (1, line_count, "Multi-line block comment can be followed by whitespaces only");
                 check_eol_rule(eol_before_token, rule);
                 if (line_indent >= 0) {
                     if (handle_indentation (&line_indent, &indent_stack, &token, '/', &pending_symbol,
@@ -912,6 +911,11 @@ token_t get_token (enum eol_rules rule) {
                     break;
                 }
                 else if (symbol == ' ' || symbol == '\t' || symbol == '\r') break;
+                else if (symbol == '/') {
+                    after_block_com = true;
+                    state = S_DIV;
+                    break;
+                }
                 else {
                    error_exit(1, line_count, "Multi-line block comment can be followed by whitespaces only");
                    break;

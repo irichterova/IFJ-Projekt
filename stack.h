@@ -1,7 +1,8 @@
 /**
- * Project name: Implementace překladače imperativního jazyka IFJ26
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Izabela Richterová (xrichti00)
  * @file stack.h
+ * @brief Declares stack structures and functions
  */
 
 #ifndef STACK_H
@@ -38,9 +39,9 @@ void stack_push (stack_t* stack, int data);
 void stack_pop (stack_t* stack);
 
 /**
- * @brief Returns the value of the data at the top of the stack 
- * @param stack Pointer to the stack whose top data value is to be returned
- * @return Integer value of the data at the top of the stack
+ * @brief Returns the value at the top of the stack 
+ * @param stack Pointer to the stack whose top value is to be returned
+ * @return Integer value at the top of the stack
  */
 int stack_top (stack_t* stack);
 

@@ -1,7 +1,8 @@
 /**
- * Project name: Implementace překladače imperativního jazyka IFJ26
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Izabela Richterová (xrichti00)
  * @file scanner.h
+ * @brief Declares token structures and functions
  */
 
 #ifndef SCANNER_H
@@ -73,15 +74,15 @@ enum eol_rules {
 union token_data {
     int int_value;
     double dbl_value;
-    char* str_value;
-    char* id;
+    char* str_value;    // needs to be freed by the caller
+    char* id;           // needs to be freed by the caller
     enum keywords_enum keyword;
 };
 
 typedef struct token {
     enum token_types type;
     union token_data data;
-    bool after_eol;
+    bool after_eol;     // indicates whether there was an EOL before the token
 } token_t;
 
 /**
@@ -91,9 +92,9 @@ typedef struct token {
 int get_line_number ();
 
 /**
- * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
- * @param rule EOL rule determining the permission for the presence of EOL
- * @return Data structure "token" 
+ * @brief Recognizes the next lexeme and represents it using the data structure "token"
+ * @param rule  EOL rule specifying whether an EOL is required, optional, or forbidden
+ * @return Data structure "token" representing the recognized lexeme
  */
 token_t get_token (enum eol_rules rule);
 
