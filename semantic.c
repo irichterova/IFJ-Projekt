@@ -397,7 +397,28 @@ static void check_command(statement_struct *command) {
             attr.value_modif = nonmodif_val;
         }
         if (command->data.var_stmt.declared_type != TYPE_UNKNOWN) {
-            attr.data_type = convert_value2param(command->data.var_stmt.declared_type);
+            if (command->data.var_stmt.init_expr->result_type != TYPE_UNKNOWN) {
+                if (compatible_type(command->data.var_stmt.declared_type,
+                                    command->data.var_stmt.init_expr->result_type)) {
+                    attr.data_type = convert_value2param(command->data.var_stmt.declared_type);
+                } else {
+                    error_exit(ERR_SEM_TYPE, command->line,
+                               "Declared type is not compatible with result type!");
+                }
+            } else {
+                attr.data_type = convert_value2param(command->data.var_stmt.declared_type);
+                // TODO: compatibility check for function with non defined return
+            }
+        } else {
+            if (command->data.var_stmt.init_expr->result_type ==
+                TYPE_BOOL) { // When extension BOOLTHEN it will be changed
+                error_exit(ERR_SEM_TYPE, command->line, "Variable cannot be type Boolean!");
+            }
+            if (command->data.var_stmt.init_expr->result_type != TYPE_UNKNOWN) {
+                attr.data_type = convert_value2param(command->data.var_stmt.init_expr->result_type);
+            } else {
+                // TODO: calling function with unknown return type
+            }
         }
         attr.codegen_id = codegen_next;
         command->data.var_stmt.codegen_id = codegen_next;
