@@ -225,6 +225,80 @@ static bool compatible_type(value_type expected, value_type actual) {
 }
 
 /**
+ * @brief checks if operand type is double or int
+ * @param operand_type type of operand
+ * @return returns true if type of operand is double or int, if not returns false
+ */
+static bool is_int_or_double(value_type operand_type) {
+    if (operand_type == TYPE_INT || operand_type == TYPE_DOUBLE) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
+ * @brief checks semantic analysis of binary operators
+ * @param op_type operator type
+ * @param left_operand_type on the left of operator
+ * @param right_operand_type on the right of operator
+ * @param line on which line operator is
+ * @return returns type of operator
+ */
+static value_type check_bin_op(operator_type op_type, value_type left_operand_type,
+                               value_type right_operand_type, int line) {
+    switch (op_type) {
+    case OP_PLUS:
+        if (left_operand_type == TYPE_STRING && right_operand_type == TYPE_STRING) {
+            return TYPE_STRING;
+        }
+        /* fall through */
+    case OP_BIN_MINUS:
+    case OP_MULTIPLICATION:
+    case OP_DIVISION:
+        if (!is_int_or_double(left_operand_type) || !is_int_or_double(right_operand_type)) {
+            error_exit(ERR_SEM_TYPE, line, "One of the operands is not int or double!");
+            return 0;
+        } else if (left_operand_type == TYPE_DOUBLE || right_operand_type == TYPE_DOUBLE) {
+            return TYPE_DOUBLE;
+        } else {
+            return TYPE_INT;
+        }
+    case OP_LESS:
+    case OP_GREATER:
+    case OP_EQUAL_GREATER:
+    case OP_EQUAL_LESS:
+        if ((is_int_or_double(left_operand_type) && is_int_or_double(right_operand_type)) ||
+            (left_operand_type == TYPE_STRING && right_operand_type == TYPE_STRING)) {
+            return TYPE_BOOL;
+        } else {
+            error_exit(ERR_SEM_TYPE, line, "Operands types are not double/int or string!");
+            return 0;
+        }
+    case OP_EQUAL:
+    case OP_NOTEQUAL:
+        if ((is_int_or_double(left_operand_type) && is_int_or_double(right_operand_type)) ||
+            (left_operand_type == right_operand_type)) {
+            return TYPE_BOOL;
+        } else {
+            error_exit(ERR_SEM_TYPE, line, "Operands types are not matching or are not numeric!");
+            return 0;
+        }
+    case OP_AND:
+    case OP_OR:
+        if (left_operand_type == TYPE_BOOL && right_operand_type == TYPE_BOOL) {
+            return TYPE_BOOL;
+        } else {
+            error_exit(ERR_SEM_TYPE, line, "Operands types are not bools!");
+            return 0;
+        }
+    default:
+        error_exit(ERR_INTERNAL, line, "Operator type doesn't match with any types!");
+        return 0;
+    }
+}
+
+/**
  * @brief checks semantic analysis of expression
  * @param expr struct with expression
  */
@@ -246,6 +320,9 @@ static void check_expression(expr_struct *expr) {
     case EXPR_BIN_OP:
         check_expression(expr->data.binary_op.left_operand);
         check_expression(expr->data.binary_op.right_operand);
+        expr->result_type = check_bin_op(
+            expr->data.binary_op.op_type, expr->data.binary_op.left_operand->result_type,
+            expr->data.binary_op.right_operand->result_type, expr->line);
         break;
     case EXPR_CALL_FUNC:
         expr_attr = search_symbol(func_hash, expr->data.call_fn.name);
