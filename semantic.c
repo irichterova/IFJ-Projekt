@@ -385,6 +385,18 @@ static void check_command(statement_struct *command) {
             error_exit(ERR_SEM_NVAL, command->line, "Variable '%s' cannot be modified!",
                        command->data.id_stmt.id_name);
         }
+        value_type id_data_type = convert_param2value(id_attr->data_type);
+        if (command->data.id_stmt.assign_expr->result_type != TYPE_UNKNOWN) {
+            if (compatible_type(id_data_type, command->data.id_stmt.assign_expr->result_type)) {
+                command->data.id_stmt.id_type = id_data_type;
+            } else {
+                error_exit(ERR_SEM_TYPE, command->line,
+                           "Id type is not compatible with result type!");
+            }
+        } else {
+            command->data.id_stmt.id_type = id_data_type;
+            // TODO: compatibility check for function with non defined return
+        }
         command->data.id_stmt.codegen_id = id_attr->codegen_id;
         break;
     case STMT_VAL:
