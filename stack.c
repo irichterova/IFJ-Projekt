@@ -5,16 +5,16 @@
  * @brief Implements the stack functions
  */
 
+#include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "stack.h"
 
-void stack_init (stack_t* stack) {
+void stack_init(stack_t *stack) {
     stack->top = NULL;
 }
 
-void stack_push (stack_t* stack, int data) {
-    element_t* new_elem = malloc(sizeof(element_t));
+void stack_push(stack_t *stack, int data) {
+    element_t *new_elem = malloc(sizeof(element_t));
     if (!new_elem) {
         fprintf(stderr, "Error: Allocation fault\n");
         exit(99);
@@ -24,15 +24,15 @@ void stack_push (stack_t* stack, int data) {
     stack->top = new_elem;
 }
 
-void stack_pop (stack_t* stack) {
+void stack_pop(stack_t *stack) {
     if (stack->top) {
-        element_t* elem2delete = stack->top;
+        element_t *elem2delete = stack->top;
         stack->top = elem2delete->next;
         free(elem2delete);
     }
 }
 
-int stack_top (stack_t* stack) {
+int stack_top(stack_t *stack) {
     if (!(stack->top)) {
         fprintf(stderr, "Error: Access to null pointer\n");
         exit(99);
@@ -40,11 +40,11 @@ int stack_top (stack_t* stack) {
     return (stack->top->data);
 }
 
-bool stack_is_empty (stack_t* stack) {
+bool stack_is_empty(stack_t *stack) {
     return (stack->top == NULL);
 }
 
-void stack_destruct (stack_t* stack) {
+void stack_destruct(stack_t *stack) {
     while (!(stack_is_empty(stack))) {
         stack_pop(stack);
     }

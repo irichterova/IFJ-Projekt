@@ -74,28 +74,28 @@ enum eol_rules {
 union token_data {
     int int_value;
     double dbl_value;
-    char* str_value;    // needs to be freed by the caller
-    char* id;           // needs to be freed by the caller
+    char *str_value; // needs to be freed by the caller
+    char *id;        // needs to be freed by the caller
     enum keywords_enum keyword;
 };
 
 typedef struct token {
     enum token_types type;
     union token_data data;
-    bool after_eol;     // indicates whether there was an EOL before the token
+    bool after_eol; // indicates whether there was an EOL before the token
 } token_t;
 
 /**
  * @brief Returns the current line number
  * @return Number of the current line
  */
-int get_line_number ();
+int get_line_number();
 
 /**
  * @brief Recognizes the next lexeme and represents it using the data structure "token"
  * @param rule  EOL rule specifying whether an EOL is required, optional, or forbidden
  * @return Data structure "token" representing the recognized lexeme
  */
-token_t get_token (enum eol_rules rule);
+token_t get_token(enum eol_rules rule);
 
 #endif
