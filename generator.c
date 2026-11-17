@@ -183,10 +183,15 @@ int gen_code(program_struct *program_code)
     newline_emit_expr("CLEARS");
     newline_emit_expr("EXIT int@0");
 
-    for(function_struct *func = program_code->first_func; func != NULL; func = func->next)
-    {
-        gen_builtin(func->func_name);
-    }
+    print_func();
+    read_line();
+    read_int();
+    read_double();
+    to_str();
+    to_int();
+    str_len();
+    ord();
+    chr();
 
     /*  Generate rest of the body of the code */
     for(function_struct *func = program_code->first_func; func != NULL; func = func->next)
@@ -584,7 +589,7 @@ void print_func()
 }
 void str_len()
 {
-    char *builtin_name = "$builtin_strlen";
+    char *builtin_name = "$builtin_strLength";
     int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
@@ -630,7 +635,7 @@ void ord()
 }
 void to_int()
 {
-    char *builtin_name = "$builtin_toint";
+    char *builtin_name = "$builtin_toInt";
     int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
@@ -646,7 +651,7 @@ void to_int()
 
 void to_str()
 {
-    char *builtin_name = "$builtin_tostr";
+    char *builtin_name = "$builtin_toStr";
     int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
@@ -690,7 +695,7 @@ void to_str()
 }
 void read_line()
 {
-    char *builtin_name = "$builtin_readline";
+    char *builtin_name = "$builtin_readLine";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$value");
@@ -702,7 +707,7 @@ void read_line()
     newline_emit_expr("PUSHS LF@$value");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
     newline_emit_expr("LABEL eof_line");
-    newline_emit_expr("PUSHS string@()");
+    newline_emit_expr("PUSHS string@");
 
     newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
@@ -710,7 +715,7 @@ void read_line()
 }
 void read_int()
 {
-    char *builtin_name = "$builtin_readint";
+    char *builtin_name = "$builtin_readInt";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$val");
@@ -731,7 +736,7 @@ void read_int()
 }
 void read_double()
 {
-    char *builtin_name = "$builtin_readdouble";
+    char *builtin_name = "$builtin_readDouble";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$val");
@@ -750,9 +755,10 @@ void read_double()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/* TO DO: finish subStr
 void sub_str()
 {
-    char *builtin_name = "$builtin_substr";
+    char *builtin_name = "$builtin_subStr";
     int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
@@ -767,3 +773,4 @@ void sub_str()
     newline_emit_expr("MOVE LF@$substr string@");
 
 }
+*/
