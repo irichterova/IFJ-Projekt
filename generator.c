@@ -35,7 +35,6 @@ void sub_str();
 void ord();
 void chr();
 
-void gen_builtin(char *func_name);
 
 /**
  * @brief  Prints formatted line of IFJ26code without a newline
@@ -112,49 +111,21 @@ void check_ptr(void *ptr)
     return;
 }
 
-void gen_builtin(char *func_name)
+
+void gen_builtin()
 {
-    if(strcmp(func_name, "print") == 0)
-    {
         print_func();
-    }
-    else if(strcmp(func_name, "readLine") == 0)
-    {
         read_line();
-    }
-    else if(strcmp(func_name, "readInt") == 0)
-    {
         read_int();
-    }
-    else if(strcmp(func_name, "readDouble") == 0)
-    {
         read_double();
-    }
-    else if(strcmp(func_name, "toStr") == 0)
-    {
         to_str();
-    }
-    else if(strcmp(func_name, "toInt") == 0)
-    {
         to_int();
-    }
-    else if(strcmp(func_name, "strLength") == 0)
-    {
         str_len();
-    }
-    else if(strcmp(func_name, "subStr") == 0)
-    {
-        sub_str();
-    }
-    else if(strcmp(func_name, "ord") == 0)
-    {
         ord();
-    }
-    else if(strcmp(func_name, "chr") == 0)
-    {
         chr();
-    }
 }
+
+
 /** 
  * @brief  Generates the final code in IFJ26code 
  * @param  program_code    A valid pointer to a structure program code
@@ -183,15 +154,7 @@ int gen_code(program_struct *program_code)
     newline_emit_expr("CLEARS");
     newline_emit_expr("EXIT int@0");
 
-    print_func();
-    read_line();
-    read_int();
-    read_double();
-    to_str();
-    to_int();
-    str_len();
-    ord();
-    chr();
+    gen_builtin();
 
     /*  Generate rest of the body of the code */
     for(function_struct *func = program_code->first_func; func != NULL; func = func->next)
@@ -364,7 +327,7 @@ void gen_expression(expr_struct* expression)
             (strcmp(expr_fn_name, "toStr") == 0) ||
             (strcmp(expr_fn_name, "toInt") == 0) ||
             (strcmp(expr_fn_name, "strLength") == 0) ||
-            (strcmp(expr_fn_name, "subStr") == 0) ||
+           // (strcmp(expr_fn_name, "subStr") == 0) ||
             (strcmp(expr_fn_name, "ord") == 0) ||
             (strcmp(expr_fn_name, "chr") == 0))
             {
@@ -565,18 +528,17 @@ void gen_function(function_struct *function)
 void print_func()
 {
     char *builtin_name = "$builtin_print";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@msg$%i", builtin_id);
-    newline_emit_expr("POPS LF@msg$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@msg");
+    newline_emit_expr("POPS LF@msg");
     newline_emit_expr("DEFVAR LF@$type");
     /*  Save the data type of the term to a temporary variable $type*/
-    newline_emit_expr("TYPE LF@$type LF@msg$%i", builtin_id);
+    newline_emit_expr("TYPE LF@$type LF@msg");
     /*  If the data type is nil, jump to print_nil*/
     newline_emit_expr("JUMPIFEQ print_nil LF@$type string@nil");
     /*  For any other data type */
-    newline_emit_expr("WRITE LF@msg$%i", builtin_id);
+    newline_emit_expr("WRITE LF@msg");
     newline_emit_expr("JUMP fn_end_%s", builtin_name);
     /*  Print nil () */
     newline_emit_expr("LABEL print_nil");
@@ -590,13 +552,12 @@ void print_func()
 void str_len()
 {
     char *builtin_name = "$builtin_strLength";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@str$%i", builtin_id);
-    newline_emit_expr("POPS LF@str$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@str");
+    newline_emit_expr("POPS LF@str");
     newline_emit_expr("DEFVAR LF@$len");
-    newline_emit_expr("STRLEN LF@$len LF@str$%i", builtin_id);
+    newline_emit_expr("STRLEN LF@$len LF@str");
     newline_emit_expr("PUSHS LF@$len");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
@@ -604,14 +565,13 @@ void str_len()
 void chr()
 {
     char *builtin_name = "$builtin_chr";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
-    newline_emit_expr("POPS LF@value$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@value");
+    newline_emit_expr("POPS LF@value");
     newline_emit_expr("DEFVAR LF@$char");
     /* Convert the integer to a char with the ASCII value of the integer and save it to a temporary variable $char, return the char*/
-    newline_emit_expr("INT2CHAR LF@$char LF@value$%i", builtin_id);
+    newline_emit_expr("INT2CHAR LF@$char LF@value");
     newline_emit_expr("PUSHS LF@$char");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
@@ -619,16 +579,15 @@ void chr()
 void ord()
 {
     char *builtin_name = "$builtin_ord";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@str$%i", builtin_id);
-    newline_emit_expr("POPS LF@str$%i", builtin_id);
-    newline_emit_expr("DEFVAR LF@idx$%i", builtin_id);
-    newline_emit_expr("POPS LF@idx$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@idx");
+    newline_emit_expr("POPS LF@idx");
+    newline_emit_expr("DEFVAR LF@str");
+    newline_emit_expr("POPS LF@str$");
     newline_emit_expr("DEFVAR LF@$value");
     /*  Convert the char on the index of the string to a ASCII value and save it to temporary value $value*/
-    newline_emit_expr("STRI2INT LF@$value LF@str$%i LF@idx$%i", builtin_id, builtin_id);
+    newline_emit_expr("STRI2INT LF@$value LF@str LF@idx");
     newline_emit_expr("PUSHS LF@$value");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
@@ -636,14 +595,13 @@ void ord()
 void to_int()
 {
     char *builtin_name = "$builtin_toInt";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
-    newline_emit_expr("POPS LF@value$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@value");
+    newline_emit_expr("POPS LF@value");
     newline_emit_expr("DEFVAR LF@$float");
     /*  Convert float to integer and save it to temporary variable $float */
-    newline_emit_expr("FLOAT2INT LF@$float LF@value$%i", builtin_id);
+    newline_emit_expr("FLOAT2INT LF@$float LF@value");
     newline_emit_expr("PUSHS LF@$float");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
@@ -652,15 +610,14 @@ void to_int()
 void to_str()
 {
     char *builtin_name = "$builtin_toStr";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@value$%i", builtin_id);
-    newline_emit_expr("POPS LF@value$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@value$");
+    newline_emit_expr("POPS LF@value$");
 
     /*  Compare data type of the value with all the other data types and jump to the right label */
     newline_emit_expr("DEFVAR LF@$type");
-    newline_emit_expr("TYPE LF@$type LF@value$%i");
+    newline_emit_expr("TYPE LF@$type LF@value$");
     newline_emit_expr("JUMPIFEQ int_type LF@$type string@int");
     newline_emit_expr("JUMPIFEQ float_type LF@$type string@float");
     newline_emit_expr("JUMPIFEQ string_type LF@$type string@string");
@@ -668,28 +625,28 @@ void to_str()
 
     /*  If the data type is string return the value */
     newline_emit_expr("LABEL string_type");
-    newline_emit_expr("PUSHS LF@value$%i", builtin_id);
+    newline_emit_expr("PUSHS LF@value$");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
 
     /*  If the data type is integer, convert the integer to a char */
     newline_emit_expr("LABEL int_type");
     newline_emit_expr("DEFVAR LF@$str");
-    newline_emit_expr("INT2STR LF@$str LF@value$%i", builtin_id);
+    newline_emit_expr("INT2STR LF@$str LF@value$");
     newline_emit_expr("PUSHS LF@$str");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
 
     /* If the data type is float, convert the float to a char first */
     newline_emit_expr("LABEL float_type");
     newline_emit_expr("DEFVAR LF@$str");
-    newline_emit_expr("FLOAT2STR LF@$str LF@value$%i", builtin_id);
+    newline_emit_expr("FLOAT2STR LF@$str LF@value$");
     newline_emit_expr("PUSHS LF@$str");
-    newline_emit_expr("JUMP fn_end_%s", builtin_name);
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
 
     /* If the data type is nil, print () */
     newline_emit_expr("LABEL type_nil");
     newline_emit_expr("PUSHS string@()");
 
-    newline_emit_expr("LABEL fn_end_%s", builtin_name);
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
