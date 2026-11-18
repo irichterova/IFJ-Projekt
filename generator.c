@@ -584,11 +584,27 @@ void ord()
     newline_emit_expr("DEFVAR LF@idx");
     newline_emit_expr("POPS LF@idx");
     newline_emit_expr("DEFVAR LF@str");
-    newline_emit_expr("POPS LF@str$");
+    newline_emit_expr("POPS LF@str");
+    newline_emit_expr("DEFVAR LF@$char");
     newline_emit_expr("DEFVAR LF@$value");
+    newline_emit_expr("DEFVAR LF@$len");
+
+    newline_emit_expr("LT LF@$value LF@idx int@0");
+    newline_emit_expr("JUMPIFEQ ord_err LF@$value bool@true");
+
+    newline_emit_expr("STRLEN LF@$len LF@str");
+    newline_emit_expr("LT LF@$value LF@str LF@$len");
+    newline_emit_expr("JUMPIFEQ ord_err LF@$value bool@false");
+
     /*  Convert the char on the index of the string to a ASCII value and save it to temporary value $value*/
-    newline_emit_expr("STRI2INT LF@$value LF@str LF@idx");
-    newline_emit_expr("PUSHS LF@$value");
+    newline_emit_expr("STRI2INT LF@$char LF@str LF@idx");
+    newline_emit_expr("PUSHS LF@$char");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
+    newline_emit_expr("LABEL ord_err");
+    newline_emit_expr("PUSHS int@-1");
+
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
