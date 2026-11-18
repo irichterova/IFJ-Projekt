@@ -16,6 +16,7 @@ static void check_command(statement_struct *command);
 static size_t codegen_next;
 static hashtable *func_hash;
 static hashtable *scope_hash;
+static function_struct *func_inspect;
 
 typedef struct builtin_func {
     char *func_name;
@@ -465,6 +466,29 @@ static void check_command(statement_struct *command) {
         if (command->data.ret_stmt != NULL) {
             check_expression(command->data.ret_stmt);
         }
+        if (func_inspect->declared_ret_type == TYPE_UNKNOWN) {
+            error_exit(ERR_SEM_OTHER, command->line,
+                       "Function does not have declared return type!");
+        } else {
+            if (command->data.ret_stmt == NULL) {
+                if (func_inspect->declared_ret_type != TYPE_UNIT) {
+                    error_exit(ERR_SEM_OTHER, command->line,
+                               "Return with no expression has to have return type Unit!");
+                }
+            } else {
+                if (func_inspect->declared_ret_type != TYPE_UNIT) {
+                    if (command->data.ret_stmt->result_type == TYPE_UNKNOWN) {
+                        // TODO: compatibility check for function with non defined return
+                    } else {
+                        if (!compatible_type(func_inspect->declared_ret_type,
+                                             command->data.ret_stmt->result_type)) {
+                            error_exit(ERR_SEM_TYPE, command->line,
+                                       "Expected type and actual type are not compatible!");
+                        }
+                    }
+                }
+            }
+        }
         break;
     case STMT_EXPR:
         check_expression(command->data.expr_stmt);
@@ -503,6 +527,7 @@ static void check_function(function_struct *func) {
                        func->param_args[jdx].param_name);
         }
     }
+    func_inspect = func;
     statement_struct *cursor = func->stmt_body;
     while (cursor != NULL) {
         check_command(cursor);
