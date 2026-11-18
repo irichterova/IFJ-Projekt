@@ -128,6 +128,7 @@ void gen_builtin()
         to_str();
         to_int();
         str_len();
+        sub_str();
         ord();
         chr();
 }
@@ -287,7 +288,7 @@ void gen_expression(expr_struct* expression)
                 /* Differentiate dividing signed and unsigned integers */
                     if(expression->result_type == TYPE_INT)
                     {
-                    newline_emit_expr("IDIVS");
+                        newline_emit_expr("IDIVS");
                     }
                     else 
                     newline_emit_expr("DIVS");
@@ -614,7 +615,7 @@ void ord()
     newline_emit_expr("JUMPIFEQ ord_err LF@$value bool@true");
 
     newline_emit_expr("STRLEN LF@$len LF@str");
-    newline_emit_expr("LT LF@$value LF@str LF@$len");
+    newline_emit_expr("LT LF@$value LF@idx LF@$len");
     newline_emit_expr("JUMPIFEQ ord_err LF@$value bool@false");
 
     /*  Convert the char on the index of the string to a ASCII value and save it to temporary value $value*/
@@ -774,22 +775,23 @@ void sub_str()
     newline_emit_expr("DEFVAR LF@$len");
     newline_emit_expr("DEFVAR LF@$value");
     newline_emit_expr("DEFVAR LF@$char");
+    newline_emit_expr("STRLEN LF@$len LF@str");
 
     newline_emit_expr("LT LF@$value LF@start int@0");
-    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@true");
     newline_emit_expr("LT LF@$value LF@end int@0");
-    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@true");
     newline_emit_expr("LT LF@$value LF@end LF@start");
-    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@true");
     newline_emit_expr("GT LF@$value LF@$len LF@start");
-    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@false");
+    newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@false");
     newline_emit_expr("LT LF@$value LF@$len LF@end");
-    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@true");
 
     newline_emit_expr("MOVE LF@$substr string@");
     newline_emit_expr("LABEL substr_add");
     newline_emit_expr("JUMPIFEQ substr_done LF@start LF@end");
-    newline_emit_expr("GETCHAR LF@$char LF$str LF@start");
+    newline_emit_expr("GETCHAR LF@$char LF@str LF@start");
     newline_emit_expr("CONCAT LF@$substr LF@$substr LF@char");
     newline_emit_expr("ADD LF@start LF@start int@1");
     newline_emit_expr("JUMP substr_add");
