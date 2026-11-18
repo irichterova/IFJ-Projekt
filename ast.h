@@ -50,6 +50,8 @@ typedef enum {
     STMT_EXPR
 } statement_type;
 
+typedef enum { FUNC_UNCHECKED, FUNC_CHECKING, FUNC_CHECKED } function_state;
+
 typedef struct unary_operator {
     operator_type op_type;
     struct expr_struct *operand;
@@ -122,6 +124,7 @@ typedef struct function_struct {
     value_type result_ret_type;
     value_type declared_ret_type;
     int is_main;
+    function_state state;
     struct statement_struct *stmt_body;
     struct function_struct *next;
 } function_struct;
