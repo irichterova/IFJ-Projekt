@@ -1,30 +1,43 @@
 CC = gcc
-CFLAGS = -g -Wall -Wextra -Werror -std=c11
+CFLAGS = -g -Wall -Wextra -std=c11
 
-.PHONY: all run clean
+all: ifj26
 
-all: run
+ifj26: main.o ast.o buffer.o error.o expression.o generator.o parser.o scanner.o semantic.o stack.o symtable.o
+	$(CC) $(CFLAGS) $^ -o ifj26
 
-expr: expression.o
+main.o: main.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-run: generator.exe
-	generator.exe > vystup.code
-	type vystup.code
+ast.o: ast.c ast.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
-generator.exe: generator.o
-	$(CC) $(CFLAGS) generator.o -o generator.exe
+buffer.o: buffer.c buffer.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+error.o: error.c error.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+expression.o: expression.c expression.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 generator.o: generator.c generator.h
-	$(CC) $(CFLAGS) -c generator.c -o generator.o
+	$(CC) $(CFLAGS) -c $< -o $@
 
-expression.o : expression.c expression.h ast.h scanner.h
+parser.o: parser.c parser.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+scanner.o: scanner.c scanner.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+semantic.o: semantic.c semantic.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+stack.o: stack.c stack.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+symtable.o: symtable.c symtable.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	del /f generator.exe generator.o vystup.code 2>nul || exit 0
-
-clean-all:
-	rm -f *.o
-
-clean-expr:
-	rm -f expression.o
+	rm -f *.o ifj26
