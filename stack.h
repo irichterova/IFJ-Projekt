@@ -7,6 +7,8 @@
 #ifndef STACK_H
 #define STACK_H
 
+#include <stdbool.h>
+
 typedef struct element {
     int data;
     struct element* next;
@@ -41,5 +43,18 @@ void stack_pop (stack_t* stack);
  * @return Integer value of the data at the top of the stack
  */
 int stack_top (stack_t* stack);
+
+/**
+ * @brief Checks whether the stack is empty
+ * @param stack Pointer to the stack 
+ * @return true if the stack is empty; false otherwise
+ */
+bool stack_is_empty (stack_t* stack);
+
+/**
+ * @brief Destroys the data structure "stack"
+ * @param stack Pointer to the stack to be destroyed
+ */
+void stack_destruct (stack_t* stack);
 
 #endif

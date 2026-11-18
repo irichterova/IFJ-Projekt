@@ -32,6 +32,8 @@ enum token_types {
     TOKEN_OP_NOT,
     TOKEN_OP_AND,
     TOKEN_OP_OR,
+    TOKEN_GENERATOR_ARROW,
+    TOKEN_FUNCTION_ARROW,
     TOKEN_ASSIGN,
     TOKEN_COLON,
     TOKEN_SEMICOLON,
@@ -59,6 +61,7 @@ enum keywords_enum {
     KEYWORD_VAR,
     KEYWORD_WHILE,
     KEYWORD_BOOLEAN,
+    KEYWORD_FOR,
 };
 
 enum eol_rules {
@@ -82,10 +85,16 @@ typedef struct token {
 } token_t;
 
 /**
+ * @brief Returns the current line number
+ * @return Number of the current line
+ */
+int get_line_number ();
+
+/**
  * @brief Recognizes a lexeme from stdin and represents it with data structure "token"
  * @param rule EOL rule determining the permission for the presence of EOL
  * @return Data structure "token" 
  */
-token_t get_token(enum eol_rules rule);
+token_t get_token (enum eol_rules rule);
 
 #endif
