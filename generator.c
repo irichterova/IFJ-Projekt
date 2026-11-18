@@ -3,7 +3,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 *
 @file generator.c
 *
-@date 9-11-2026
+@date 18-11-2026
 @author xdongop00 Phuong Uyen Dongova
 */
 #include "generator.h"
@@ -111,7 +111,9 @@ void check_ptr(void *ptr)
     return;
 }
 
-
+/**
+ * @brief   Generate all built in functions
+ */
 void gen_builtin()
 {
         print_func();
@@ -320,6 +322,7 @@ void gen_expression(expr_struct* expression)
             char *expr_fn_name = expression->data.call_fn.name;
             /*  Create a local frame for the function and call the function */
             newline_emit_expr("CREATEFRAME");
+            /*  Check if the function is a built in type, if so call function with prefix fn_$builtin_ */
             if((strcmp(expr_fn_name, "print") == 0) ||
             (strcmp(expr_fn_name, "readLine") == 0) ||
             (strcmp(expr_fn_name, "readInt") == 0) ||
@@ -334,7 +337,7 @@ void gen_expression(expr_struct* expression)
                 newline_emit_expr("CALL fn_$builtin_%s", expr_fn_name);
             }
             else
-            newline_emit_expr("CALL fn_%s", expression->data.call_fn.name);
+            newline_emit_expr("CALL fn_%s", expr_fn_name);
 
             break;
         default:
@@ -525,6 +528,9 @@ void gen_function(function_struct *function)
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief Built in function that prints the value onto standard output
+ */
 void print_func()
 {
     char *builtin_name = "$builtin_print";
@@ -549,6 +555,9 @@ void print_func()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that returns the lenght of a string
+ */
 void str_len()
 {
     char *builtin_name = "$builtin_strLength";
@@ -556,12 +565,16 @@ void str_len()
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@str");
     newline_emit_expr("POPS LF@str");
+    /*  Temprorary variable to save the lenght */
     newline_emit_expr("DEFVAR LF@$len");
     newline_emit_expr("STRLEN LF@$len LF@str");
     newline_emit_expr("PUSHS LF@$len");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that returns char that is under the value converted by ASCII 
+ */
 void chr()
 {
     char *builtin_name = "$builtin_chr";
@@ -576,6 +589,9 @@ void chr()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that returns value that is created by converting the char to ASCII value, if the string is empty or the index is invalid, return -1
+ */
 void ord()
 {
     char *builtin_name = "$builtin_ord";
@@ -608,6 +624,9 @@ void ord()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that converts a double to an integer
+ */
 void to_int()
 {
     char *builtin_name = "$builtin_toInt";
@@ -622,7 +641,9 @@ void to_int()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
-
+/**
+ * @brief   Built in function that returns converted any type of a value to a string based on the data type
+ */
 void to_str()
 {
     char *builtin_name = "$builtin_toStr";
@@ -666,6 +687,9 @@ void to_str()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that reads one line of string ending with LF or until it reaches EOF
+ */
 void read_line()
 {
     char *builtin_name = "$builtin_readLine";
