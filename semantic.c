@@ -227,6 +227,26 @@ static bool compatible_type(value_type expected, value_type actual) {
 }
 
 /**
+ * @brief checks if branch ends with return
+ * @param branch branch of if statement
+ * @return returns true if branch ends with return, false if not
+ */
+static bool ends_with_return(statement_struct *branch) {
+    statement_struct *cursor = branch;
+    while (cursor->next != NULL) {
+        cursor = cursor->next;
+    }
+    if (cursor->stmt_type == STMT_RETURN) {
+        return true;
+    } else if (cursor->stmt_type == STMT_IF) {
+        return ends_with_return(cursor->data.if_stmt.else_stmt) &&
+               ends_with_return(cursor->data.if_stmt.then_stmt);
+    } else {
+        return false;
+    }
+}
+
+/**
  * @brief checks if operand type is double or int
  * @param operand_type type of operand
  * @return returns true if type of operand is double or int, if not returns false
@@ -529,9 +549,39 @@ static void check_function(function_struct *func) {
     }
     func_inspect = func;
     statement_struct *cursor = func->stmt_body;
+    statement_struct *last_stmt = NULL;
     while (cursor != NULL) {
         check_command(cursor);
+        last_stmt = cursor;
         cursor = cursor->next;
+    }
+    if (func->declared_ret_type != TYPE_UNIT && func->declared_ret_type != TYPE_UNKNOWN) {
+        switch (last_stmt->stmt_type) {
+        case STMT_EXPR:
+            if (last_stmt->data.expr_stmt->result_type == TYPE_UNKNOWN) {
+                // TODO: compatibility check for function with non defined return
+            } else {
+                if (!compatible_type(func->declared_ret_type,
+                                     last_stmt->data.expr_stmt->result_type)) {
+                    error_exit(ERR_SEM_TYPE, last_stmt->line, "Types are not compatible!");
+                }
+            }
+            break;
+        case STMT_VAL:
+        case STMT_VAR:
+        case STMT_ASSIGN:
+        case STMT_WHILE:
+            error_exit(ERR_SEM_TYPE, last_stmt->line, "Return type is not Unit!");
+            break;
+        case STMT_RETURN:
+            break;
+        case STMT_IF:
+            if (!ends_with_return(func->stmt_body)) {
+                error_exit(ERR_SEM_TYPE, last_stmt->line,
+                           "If statement does not ends with return or Unit!");
+            }
+            break;
+        }
     }
     pop_scope();
 }
