@@ -6,7 +6,7 @@ all: ifj26
 ifj26: main.o ast.o buffer.o error.o expression.o generator.o parser.o scanner.o semantic.o stack.o symtable.o
 	$(CC) $(CFLAGS) $^ -o ifj26
 
-main.o: main.c
+main.o: main.c parser.h ast.h semantic.h generator.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 ast.o: ast.c ast.h
