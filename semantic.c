@@ -8,15 +8,18 @@
 #include "error.h"
 #include "symtable.h"
 #include <stdlib.h>
+#include <string.h>
 
 #define MAX_PARAMS 3
 
+static void check_function(function_struct *func);
 static void check_command(statement_struct *command);
 
 static size_t codegen_next;
 static hashtable *func_hash;
 static hashtable *scope_hash;
 static function_struct *func_inspect;
+static program_struct *prog;
 
 typedef struct builtin_func {
     char *func_name;
@@ -247,6 +250,22 @@ static bool ends_with_return(statement_struct *branch) {
 }
 
 /**
+ * @brief finds function by its name in program
+ * @param name name of wanted function
+ * @return returns wanted function, if not found returns NULL
+ */
+static function_struct *find_func(char *name) {
+    function_struct *cursor = prog->first_func;
+    while (cursor != NULL) {
+        if (strcmp(name, cursor->func_name) == 0) {
+            return cursor;
+        }
+        cursor = cursor->next;
+    }
+    return NULL;
+}
+
+/**
  * @brief checks if operand type is double or int
  * @param operand_type type of operand
  * @return returns true if type of operand is double or int, if not returns false
@@ -385,8 +404,16 @@ static void check_expression(expr_struct *expr) {
         if (expr_attr->ret_state == ret_inferred) {
             expr->result_type = convert_param2value(expr_attr->return_type);
         } else {
-            // TODO: fixed in return types
-            expr->result_type = TYPE_UNKNOWN;
+            function_struct *found_func = find_func(expr->data.call_fn.name);
+            if (found_func == NULL){
+                error_exit(ERR_INTERNAL, expr->line, "Function was not found!");
+            }
+            check_function(found_func);
+            if (expr_attr->ret_state == ret_inferred){
+                expr->result_type = convert_param2value(expr_attr->return_type);
+            } else{
+                expr->result_type = TYPE_UNKNOWN;
+            }
         }
         break;
     default:
@@ -530,6 +557,16 @@ static void check_command(statement_struct *command) {
  * @param func struct with function attributes
  */
 static void check_function(function_struct *func) {
+    if (func->state == FUNC_CHECKED) {
+        return;
+    } else if (func->state == FUNC_CHECKING) {
+        error_exit(ERR_SEM_TYPE, func->line, "Recursion without type!");
+    } else {
+        func->state = FUNC_CHECKING;
+    }
+    function_struct *prev_func_inspect = func_inspect;
+    hashtable *prev_scope = scope_hash;
+    scope_hash = NULL;
     push_scope();
     for (int jdx = 0; jdx < func->param_argc; jdx++) {
         attributes attr = {0};
@@ -584,6 +621,9 @@ static void check_function(function_struct *func) {
         }
     }
     pop_scope();
+    func_inspect = prev_func_inspect;
+    scope_hash = prev_scope;
+    func->state = FUNC_CHECKED;
 }
 
 void check_program(program_struct *program) {
@@ -594,6 +634,7 @@ void check_program(program_struct *program) {
     insert_builtin_funcs();
     insert_program_funcs(program);
     function_struct *cursor = program->first_func;
+    prog = program;
     while (cursor != NULL) {
         check_function(cursor);
         cursor = cursor->next;
