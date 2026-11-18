@@ -17,6 +17,11 @@ static int cycle_counter = 0;
 static char *func_name = NULL;
 static value_type func_ret = TYPE_UNKNOWN;
 
+/*  Generate code from ast.h */
+void gen_function(function_struct* function);
+void gen_statement(statement_struct* statement);
+void gen_expression(expr_struct* expression);
+
 /* INT2FLOATS conversion */
 void int2float(value_type first_type, value_type second_type);
 
