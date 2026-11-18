@@ -327,7 +327,7 @@ void gen_expression(expr_struct* expression)
             (strcmp(expr_fn_name, "toStr") == 0) ||
             (strcmp(expr_fn_name, "toInt") == 0) ||
             (strcmp(expr_fn_name, "strLength") == 0) ||
-           // (strcmp(expr_fn_name, "subStr") == 0) ||
+            (strcmp(expr_fn_name, "subStr") == 0) ||
             (strcmp(expr_fn_name, "ord") == 0) ||
             (strcmp(expr_fn_name, "chr") == 0))
             {
@@ -728,22 +728,48 @@ void read_double()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
-/* TO DO: finish subStr
+
 void sub_str()
 {
     char *builtin_name = "$builtin_subStr";
-    int builtin_id = 0;
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
-    newline_emit_expr("DEFVAR LF@$end");
-    newline_emit_expr("POPS LF@$end");
-    newline_emit_expr("DEFVAR LF@$start");
-    newline_emit_expr("POPS LF@$start");
-    newline_emit_expr("DEFVAR LF@str$%i", builtin_id);
-    newline_emit_expr("POPS LF@str$%i", builtin_id);
+    newline_emit_expr("DEFVAR LF@end");
+    newline_emit_expr("POPS LF@end");
+    newline_emit_expr("DEFVAR LF@start");
+    newline_emit_expr("POPS LF@start");
+    newline_emit_expr("DEFVAR LF@str");
+    newline_emit_expr("POPS LF@str");
 
     newline_emit_expr("DEFVAR LF@$substr");
-    newline_emit_expr("MOVE LF@$substr string@");
+    newline_emit_expr("DEFVAR LF@$len");
+    newline_emit_expr("DEFVAR LF@$value");
+    newline_emit_expr("DEFVAR LF@$char");
 
+    newline_emit_expr("LT LF@$value LF@start int@0");
+    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("LT LF@$value LF@end int@0");
+    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("LT LF@$value LF@end LF@start");
+    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+    newline_emit_expr("GT LF@$value LF@$len LF@start");
+    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@false");
+    newline_emit_expr("LT LF@$value LF@$len LF@end");
+    newline_emit_expr("JUMPIEQ substr_err LF@$value bool@true");
+
+    newline_emit_expr("MOVE LF@$substr string@");
+    newline_emit_expr("LABEL substr_add");
+    newline_emit_expr("JUMPIFEQ substr_done LF@start LF@end");
+    newline_emit_expr("GETCHAR LF@$char LF$str LF@start");
+    newline_emit_expr("CONCAT LF@$substr LF@$substr LF@char");
+    newline_emit_expr("ADD LF@start LF@start int@1");
+    newline_emit_expr("JUMP substr_add");
+
+    newline_emit_expr("LABEL substr_done");
+    newline_emit_expr("PUSHS LF@$substr");
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+
+    newline_emit_expr("LABEL substr_err");
+    newline_emit_expr("EXIT int@40");
 }
-*/
