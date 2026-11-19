@@ -821,9 +821,10 @@ void sub_str()
 
     newline_emit_expr("LABEL substr_done");
     newline_emit_expr("PUSHS LF@$substr");
-    newline_emit_expr("POPFRAME");
-    newline_emit_expr("RETURN");
-
     newline_emit_expr("LABEL substr_err");
     newline_emit_expr("EXIT int@40");
+    
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
 }
