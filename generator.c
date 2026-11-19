@@ -90,12 +90,12 @@ void emit_expr_str(char *str)
 }
 /**
  * @brief   Checks if data type conversion between two variables is needed and generates the conversion 
- * @param   var1_type   First variable that could be data type INT (integer)
- * @param   var2_type   Second variable that could be data type FLOAT (double/float)
+ * @param  first_type   First variable that could be data type INT (integer)
+ * @param  second_type   Second variable that could be data type FLOAT (double/float)
  */
-void int2float(value_type var1_type, value_type var2_type)
+void int2float(value_type first_type, value_type second_type)
 {
-    if(var1_type == TYPE_INT && var2_type == TYPE_DOUBLE)
+    if(first_type == TYPE_INT && second_type == TYPE_DOUBLE)
     {
         newline_emit_expr("INT2FLOATS");
     }
@@ -821,9 +821,10 @@ void sub_str()
 
     newline_emit_expr("LABEL substr_done");
     newline_emit_expr("PUSHS LF@$substr");
-    newline_emit_expr("POPFRAME");
-    newline_emit_expr("RETURN");
-
     newline_emit_expr("LABEL substr_err");
     newline_emit_expr("EXIT int@40");
+    
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
 }
