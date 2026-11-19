@@ -792,7 +792,7 @@ void sub_str()
     newline_emit_expr("LABEL substr_add");
     newline_emit_expr("JUMPIFEQ substr_done LF@start LF@end");
     newline_emit_expr("GETCHAR LF@$char LF@str LF@start");
-    newline_emit_expr("CONCAT LF@$substr LF@$substr LF@char");
+    newline_emit_expr("CONCAT LF@$substr LF@$substr LF@$char");
     newline_emit_expr("ADD LF@start LF@start int@1");
     newline_emit_expr("JUMP substr_add");
 
