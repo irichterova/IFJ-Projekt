@@ -496,7 +496,19 @@ static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
 
             if (token.type == TOKEN_COMMA) {
                 token = get_token(EOL_OPTIONAL);
-                continue;
+                // We have to check if the edge case of ",\n)" is present
+                if (token.type == TOKEN_R_PARENTH) {
+                    // If it is, it's correct due to specifications of IFJ26
+                    if (token.after_eol == true) {
+                        break;
+                    } // Otherwise we must error_exit
+                    else {
+                        error_exit(ERR_SYN, line, "Incorrect grammar, can't put ',' in front of ')' without a new line!");
+                        break;
+                    }
+                } else {
+                    continue;
+                }
             } else if (token.type == TOKEN_R_PARENTH) {
                 break;
             } else {
