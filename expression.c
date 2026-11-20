@@ -91,6 +91,11 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
         case TOKEN_STR_LITERAL:
         case TOKEN_TRUE_LITERAL:
         case TOKEN_FALSE_LITERAL:
+            // To detect situations such as this: val x = id(1) id(2)
+            // We must check for ) in the previous token
+            if (prev == PSA_RIGHT_P) {
+                error_exit(ERR_SYN, get_line_number(), "Operands can't stand directly after a function call!");
+            }
             return PSA_ID;
 
         case TOKEN_OP_ADD:
