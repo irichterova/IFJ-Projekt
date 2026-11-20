@@ -6,8 +6,8 @@
 
 #include "parser.h"
 #include "error.h"
-#include "scanner.h"
 #include "expression.h"
+#include "scanner.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -116,6 +116,9 @@ static value_type parse_type(enum eol_rules eol) {
         case KEYWORD_UNIT:
             next_token(eol);
             return TYPE_UNIT;
+        case KEYWORD_BOOLEAN:
+            next_token(eol);
+            return TYPE_BOOL;
         default:
             error_exit(ERR_SYN, get_line_number(), "Token type doesn't match any type!");
         }
@@ -329,8 +332,16 @@ static statement_struct *parse_block(void) {
  * @return block of else statement
  */
 static statement_struct *parse_else(void) {
-    keyword_t_check(KEYWORD_ELSE, EOL_REQUIRED);
-    return parse_block();
+    if (token.type != TOKEN_KEYWORD || token.data.keyword != KEYWORD_ELSE) {
+        return NULL;
+    } else {
+        next_token(EOL_OPTIONAL);
+        if (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF && !token.after_eol) {
+            return parse_if();
+        } else {
+            return parse_block();
+        }
+    }
 }
 
 /**

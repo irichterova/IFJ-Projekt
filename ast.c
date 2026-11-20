@@ -73,7 +73,9 @@ static void free_statements(statement_struct *stmt) {
         case STMT_IF:
             free_expr(cursor->data.if_stmt.if_expr);
             free_statements(cursor->data.if_stmt.then_stmt);
-            free_statements(cursor->data.if_stmt.else_stmt);
+            if (cursor->data.if_stmt.else_stmt != NULL) {
+                free_statements(cursor->data.if_stmt.else_stmt);
+            }
             break;
         }
         free(cursor);

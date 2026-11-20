@@ -37,7 +37,8 @@ static const builtin_func funcs[] = {{"print", 1, {any_dt}, unit_dt},
                                      {"strLength", 1, {string_dt}, int_dt},
                                      {"subStr", 3, {string_dt, int_dt, int_dt}, string_dt},
                                      {"ord", 2, {string_dt, int_dt}, int_dt},
-                                     {"chr", 1, {int_dt}, string_dt}};
+                                     {"chr", 1, {int_dt}, string_dt},
+                                     {"readBoolean", 0, {0}, bool_dt}};
 
 /**
  * @brief converts value_type to param_type
@@ -242,8 +243,12 @@ static bool ends_with_return(statement_struct *branch) {
     if (cursor->stmt_type == STMT_RETURN) {
         return true;
     } else if (cursor->stmt_type == STMT_IF) {
-        return ends_with_return(cursor->data.if_stmt.else_stmt) &&
-               ends_with_return(cursor->data.if_stmt.then_stmt);
+        if (cursor->data.if_stmt.else_stmt == NULL) {
+            return false;
+        } else {
+            return ends_with_return(cursor->data.if_stmt.else_stmt) &&
+                   ends_with_return(cursor->data.if_stmt.then_stmt);
+        }
     } else {
         return false;
     }
@@ -269,8 +274,12 @@ static bool ends_with_unit(statement_struct *branch) {
                cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE) {
         return true;
     } else if (cursor->stmt_type == STMT_IF) {
-        return ends_with_unit(cursor->data.if_stmt.else_stmt) &&
-               ends_with_unit(cursor->data.if_stmt.then_stmt);
+        if (cursor->data.if_stmt.else_stmt == NULL) {
+            return ends_with_unit(cursor->data.if_stmt.then_stmt);
+        } else {
+            return ends_with_unit(cursor->data.if_stmt.else_stmt) &&
+                   ends_with_unit(cursor->data.if_stmt.then_stmt);
+        }
     } else {
         return false;
     }
@@ -500,10 +509,6 @@ static void check_command(statement_struct *command) {
                            "Declared type is not compatible with result type!");
             }
         } else {
-            if (command->data.var_stmt.init_expr->result_type ==
-                TYPE_BOOL) { // When extension BOOLTHEN it will be changed
-                error_exit(ERR_SEM_TYPE, command->line, "Variable cannot be type Boolean!");
-            }
             attr.data_type = convert_value2param(command->data.var_stmt.init_expr->result_type);
         }
         attr.codegen_id = codegen_next;
@@ -522,8 +527,7 @@ static void check_command(statement_struct *command) {
             check_expression(command->data.ret_stmt);
         }
         if (func_inspect->declared_ret_type == TYPE_UNKNOWN) {
-            error_exit(ERR_SEM_TYPE, command->line,
-                       "Function does not have declared return type!");
+            error_exit(ERR_SEM_TYPE, command->line, "Function does not have declared return type!");
         } else {
             if (command->data.ret_stmt == NULL) {
                 if (func_inspect->declared_ret_type != TYPE_UNIT) {
@@ -547,7 +551,9 @@ static void check_command(statement_struct *command) {
     case STMT_IF:
         check_condition(command->data.if_stmt.if_expr);
         check_block(command->data.if_stmt.then_stmt);
-        check_block(command->data.if_stmt.else_stmt);
+        if (command->data.if_stmt.else_stmt != NULL) {
+            check_block(command->data.if_stmt.else_stmt);
+        }
         break;
     case STMT_WHILE:
         check_condition(command->data.while_lp.while_expr);
@@ -626,11 +632,7 @@ static void check_function(function_struct *func) {
         value_type derived_type = TYPE_UNKNOWN;
         switch (last_stmt->stmt_type) {
         case STMT_EXPR:
-            if (last_stmt->data.expr_stmt->result_type == TYPE_BOOL) {
-                error_exit(ERR_SEM_TYPE, last_stmt->line, "Wrong type for expression!");
-            } else {
-                derived_type = last_stmt->data.expr_stmt->result_type;
-            }
+            derived_type = last_stmt->data.expr_stmt->result_type;
             break;
         case STMT_VAL:
         case STMT_VAR:
