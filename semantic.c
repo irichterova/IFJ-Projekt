@@ -522,12 +522,12 @@ static void check_command(statement_struct *command) {
             check_expression(command->data.ret_stmt);
         }
         if (func_inspect->declared_ret_type == TYPE_UNKNOWN) {
-            error_exit(ERR_SEM_OTHER, command->line,
+            error_exit(ERR_SEM_TYPE, command->line,
                        "Function does not have declared return type!");
         } else {
             if (command->data.ret_stmt == NULL) {
                 if (func_inspect->declared_ret_type != TYPE_UNIT) {
-                    error_exit(ERR_SEM_OTHER, command->line,
+                    error_exit(ERR_SEM_TYPE, command->line,
                                "Return with no expression has to have return type Unit!");
                 }
             } else {
