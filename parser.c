@@ -506,6 +506,26 @@ static statement_struct *parse_for(void) {
         next_token(EOL_FORBIDDEN);
         stmt->data.for_lp.step = parse_expr(token, &token);
     }
+    expr_struct *guard;
+    while (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF && !token.after_eol) {
+        next_token(EOL_FORBIDDEN);
+        guard = parse_expr(token, &token);
+        if (stmt->data.for_lp.guard == NULL) {
+            stmt->data.for_lp.guard = guard;
+        } else {
+            expr_struct *new_guard = calloc(1, sizeof(expr_struct));
+            if (new_guard == NULL) {
+                error_exit(ERR_INTERNAL, stmt->line, "Memory allocation failed!");
+            }
+            new_guard->node_type = EXPR_BIN_OP;
+            new_guard->data.binary_op.op_type = OP_AND;
+            new_guard->data.binary_op.left_operand = stmt->data.for_lp.guard;
+            new_guard->data.binary_op.right_operand = guard;
+            new_guard->line = stmt->line;
+            new_guard->result_type = TYPE_UNKNOWN;
+            stmt->data.for_lp.guard = new_guard;
+        }
+    }
     keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
     stmt->data.for_lp.body = parse_branch_body(false);
     return stmt;
