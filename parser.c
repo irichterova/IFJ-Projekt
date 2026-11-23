@@ -16,6 +16,7 @@ static void parse_params_next(function_struct *func);
 static statement_struct *parse_while(void);
 static statement_struct *parse_if(void);
 static expr_struct *parse_expr_or_if(void);
+static statement_struct *parse_for(void);
 
 /**
  * @brief selects next token from scanner
@@ -282,6 +283,8 @@ static statement_struct *parse_statement(void) {
             return parse_while();
         case KEYWORD_IF:
             return parse_if();
+        case KEYWORD_FOR:
+            return parse_for();
         default:
             error_exit(ERR_SYN, get_line_number(), "Unexpected keyword!");
         }
@@ -339,7 +342,7 @@ static statement_struct *parse_statement_next(void) {
     if (token.type != TOKEN_DEDENT) {
         statement_struct *stmt = parse_statement();
         if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE &&
-            !ends_with_if_expr(stmt)) {
+            !ends_with_if_expr(stmt) && stmt->stmt_type != STMT_FOR) {
             parse_statement_end(false);
         }
         stmt->next = parse_statement_next();
@@ -355,7 +358,8 @@ static statement_struct *parse_statement_next(void) {
 static statement_struct *parse_block(void) {
     type_t_check(TOKEN_INDENT, EOL_OPTIONAL);
     statement_struct *stmt = parse_statement();
-    if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE && !ends_with_if_expr(stmt)) {
+    if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE && !ends_with_if_expr(stmt) &&
+        stmt->stmt_type != STMT_FOR) {
         parse_statement_end(false);
     }
     stmt->next = parse_statement_next();
@@ -376,7 +380,7 @@ static statement_struct *parse_branch_body(bool allow_else) {
     } else {
         stmt = parse_statement();
         if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE &&
-            !ends_with_if_expr(stmt)) {
+            !ends_with_if_expr(stmt) && stmt->stmt_type != STMT_FOR) {
             parse_statement_end(allow_else);
         }
         return stmt;
@@ -463,6 +467,47 @@ static statement_struct *parse_while(void) {
     stmt->data.while_lp.while_expr = parse_expr(token, &token);
     keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
     stmt->data.while_lp.while_body = parse_branch_body(false);
+    return stmt;
+}
+
+/**
+ * @brief checks syntax of for loop
+ * @return statement of for loop
+ */
+static statement_struct *parse_for(void) {
+    statement_struct *stmt = create_stmt(get_line_number(), STMT_FOR);
+    next_token(EOL_FORBIDDEN);
+    if (token.type == TOKEN_IDENTIFIER) {
+        stmt->data.for_lp.id_name = token.data.id;
+    } else {
+        error_exit(ERR_SYN, get_line_number(), "After for must be identifier!");
+    }
+    next_token(EOL_FORBIDDEN);
+    type_t_check(TOKEN_GENERATOR_ARROW, EOL_FORBIDDEN);
+    stmt->data.for_lp.from = parse_expr(token, &token);
+    if (token.type == TOKEN_IDENTIFIER) {
+        if (strcmp(token.data.id, "to") == 0) {
+            stmt->data.for_lp.inclusive = true;
+            free(token.data.id);
+            next_token(EOL_FORBIDDEN);
+        } else if (strcmp(token.data.id, "until") == 0) {
+            stmt->data.for_lp.inclusive = false;
+            free(token.data.id);
+            next_token(EOL_FORBIDDEN);
+        } else {
+            error_exit(ERR_SYN, get_line_number(), "Token must be 'to' or 'until'!");
+        }
+    } else {
+        error_exit(ERR_SYN, get_line_number(), "Token must be identifier!");
+    }
+    stmt->data.for_lp.to = parse_expr(token, &token);
+    if (token.type == TOKEN_IDENTIFIER && (strcmp(token.data.id, "by") == 0)) {
+        free(token.data.id);
+        next_token(EOL_FORBIDDEN);
+        stmt->data.for_lp.step = parse_expr(token, &token);
+    }
+    keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
+    stmt->data.for_lp.body = parse_branch_body(false);
     return stmt;
 }
 

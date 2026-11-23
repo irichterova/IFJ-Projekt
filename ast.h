@@ -6,6 +6,7 @@
 
 #ifndef AST_H
 #define AST_H
+#include <stdbool.h>
 #include <stddef.h>
 
 typedef enum { TYPE_INT, TYPE_DOUBLE, TYPE_STRING, TYPE_UNIT, TYPE_BOOL, TYPE_UNKNOWN } value_type;
@@ -48,7 +49,8 @@ typedef enum {
     STMT_RETURN,
     STMT_WHILE,
     STMT_IF,
-    STMT_EXPR
+    STMT_EXPR,
+    STMT_FOR
 } statement_type;
 
 typedef enum { FUNC_UNCHECKED, FUNC_CHECKING, FUNC_CHECKED } function_state;
@@ -89,6 +91,17 @@ typedef struct while_loop {
     struct statement_struct *while_body;
 } while_loop;
 
+typedef struct for_loop {
+    char *id_name;
+    size_t codegen_id;
+    struct expr_struct *from;
+    struct expr_struct *to;
+    struct expr_struct *step;
+    bool inclusive;
+    struct expr_struct *guard;
+    struct statement_struct *body;
+} for_loop;
+
 typedef struct if_statement {
     struct expr_struct *if_expr;
     struct statement_struct *then_stmt;
@@ -100,6 +113,7 @@ typedef union {
     id_assign id_stmt;
     while_loop while_lp;
     if_statement if_stmt;
+    for_loop for_lp;
     struct expr_struct *ret_stmt;
     struct expr_struct *expr_stmt;
 } statement_data;

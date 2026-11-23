@@ -84,6 +84,14 @@ static void free_statements(statement_struct *stmt) {
                 free_statements(cursor->data.if_stmt.else_stmt);
             }
             break;
+        case STMT_FOR:
+            free(cursor->data.for_lp.id_name);
+            free_expr(cursor->data.for_lp.from);
+            free_expr(cursor->data.for_lp.to);
+            free_expr(cursor->data.for_lp.step);
+            free_expr(cursor->data.for_lp.guard);
+            free_statements(cursor->data.for_lp.body);
+            break;
         }
         free(cursor);
         cursor = next;
