@@ -14,6 +14,7 @@
 
 static void check_function(function_struct *func);
 static void check_command(statement_struct *command);
+static void check_condition(expr_struct *expr);
 
 static size_t codegen_next;
 static hashtable *func_hash;
@@ -286,6 +287,59 @@ static bool ends_with_unit(statement_struct *branch) {
 }
 
 /**
+ * @brief compares two value types
+ * @param first first type of branch
+ * @param second second type of branch
+ * @param line on which line is branch
+ * @return if they are same returns them, if one is unknown returns the other one, if one is int and
+ * second i double returns double, if none above returns error
+ */
+static value_type unify_types(value_type first, value_type second, int line) {
+    if (first == TYPE_UNKNOWN && second != TYPE_UNKNOWN) {
+        return second;
+    } else if (second == TYPE_UNKNOWN && first != TYPE_UNKNOWN) {
+        return first;
+    } else if (first == second) {
+        return first;
+    } else if ((first == TYPE_INT && second == TYPE_DOUBLE) ||
+               (first == TYPE_DOUBLE && second == TYPE_INT)) {
+        return TYPE_DOUBLE;
+    } else {
+        error_exit(ERR_SEM_TYPE, line, "Types of branch does not match with each other!");
+        return TYPE_UNKNOWN;
+    }
+}
+
+/**
+ * @brief checks result type of block based on type of statement
+ * @param block block we are checking
+ * @return returns type of value
+ */
+static value_type block_result_type(statement_struct *block) {
+    statement_struct *cursor = block;
+    while (cursor->next != NULL) {
+        cursor = cursor->next;
+    }
+    if (cursor->stmt_type == STMT_EXPR) {
+        return cursor->data.expr_stmt->result_type;
+    } else if (cursor->stmt_type == STMT_VAL || cursor->stmt_type == STMT_VAR ||
+               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE) {
+        return TYPE_UNIT;
+    } else if (cursor->stmt_type == STMT_IF) {
+        if (cursor->data.if_stmt.else_stmt == NULL) {
+            return TYPE_UNIT;
+        } else {
+            return unify_types(block_result_type(cursor->data.if_stmt.then_stmt),
+                               block_result_type(cursor->data.if_stmt.else_stmt), cursor->line);
+        }
+    } else if (cursor->stmt_type == STMT_RETURN) {
+        return TYPE_UNKNOWN;
+    } else {
+        return TYPE_UNKNOWN;
+    }
+}
+
+/**
  * @brief finds function by its name in program
  * @param name name of wanted function
  * @return returns wanted function, if not found returns NULL
@@ -447,6 +501,14 @@ static void check_expression(expr_struct *expr) {
             check_function(found_func);
             expr->result_type = convert_param2value(expr_attr->return_type);
         }
+        break;
+    case EXPR_IF:
+        check_condition(expr->data.if_stmt.if_expr);
+        check_block(expr->data.if_stmt.then_stmt);
+        check_block(expr->data.if_stmt.else_stmt);
+        expr->result_type =
+            unify_types(block_result_type(expr->data.if_stmt.then_stmt),
+                        block_result_type(expr->data.if_stmt.else_stmt), expr->line);
         break;
     default:
         break;
