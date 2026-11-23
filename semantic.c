@@ -232,30 +232,6 @@ static bool compatible_type(value_type expected, value_type actual) {
 }
 
 /**
- * @brief checks if branch ends with return
- * @param branch branch of if statement
- * @return returns true if branch ends with return, false if not
- */
-static bool ends_with_return(statement_struct *branch) {
-    statement_struct *cursor = branch;
-    while (cursor->next != NULL) {
-        cursor = cursor->next;
-    }
-    if (cursor->stmt_type == STMT_RETURN) {
-        return true;
-    } else if (cursor->stmt_type == STMT_IF) {
-        if (cursor->data.if_stmt.else_stmt == NULL) {
-            return false;
-        } else {
-            return ends_with_return(cursor->data.if_stmt.else_stmt) &&
-                   ends_with_return(cursor->data.if_stmt.then_stmt);
-        }
-    } else {
-        return false;
-    }
-}
-
-/**
  * @brief checks if branch ends with unit
  * @param branch branch of if statement
  * @return returns true if branch ends with unit, false if not
@@ -667,6 +643,7 @@ static void check_function(function_struct *func) {
     if (func->declared_ret_type != TYPE_UNKNOWN) {
         func->result_ret_type = func->declared_ret_type;
         if (func->declared_ret_type != TYPE_UNIT) {
+            value_type block_res = block_result_type(func->stmt_body);
             switch (last_stmt->stmt_type) {
             case STMT_EXPR:
                 if (!compatible_type(func->declared_ret_type,
@@ -683,9 +660,10 @@ static void check_function(function_struct *func) {
             case STMT_RETURN:
                 break;
             case STMT_IF:
-                if (!ends_with_return(func->stmt_body)) {
+                if (block_res != TYPE_UNKNOWN &&
+                    !compatible_type(func->declared_ret_type, block_res)) {
                     error_exit(ERR_SEM_TYPE, last_stmt->line,
-                               "If statement does not ends with return or Unit!");
+                               "If result does not match with declared result type!");
                 }
                 break;
             }
@@ -703,10 +681,14 @@ static void check_function(function_struct *func) {
             derived_type = TYPE_UNIT;
             break;
         case STMT_IF:
-            if (ends_with_unit(func->stmt_body)) {
-                derived_type = TYPE_UNIT;
+            if (last_stmt->data.if_stmt.else_stmt != NULL) {
+                derived_type = block_result_type(func->stmt_body);
             } else {
-                error_exit(ERR_SEM_TYPE, last_stmt->line, "Function does not end with unit!");
+                if (ends_with_unit(func->stmt_body)) {
+                    derived_type = TYPE_UNIT;
+                } else {
+                    error_exit(ERR_SEM_TYPE, last_stmt->line, "Function does not end with unit!");
+                }
             }
             break;
         default:
