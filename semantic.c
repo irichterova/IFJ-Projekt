@@ -248,7 +248,8 @@ static bool ends_with_unit(statement_struct *branch) {
             return false;
         }
     } else if (cursor->stmt_type == STMT_VAL || cursor->stmt_type == STMT_VAR ||
-               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE) {
+               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE ||
+               cursor->stmt_type == STMT_FOR) {
         return true;
     } else if (cursor->stmt_type == STMT_IF) {
         if (cursor->data.if_stmt.else_stmt == NULL) {
@@ -299,7 +300,8 @@ static value_type block_result_type(statement_struct *block) {
     if (cursor->stmt_type == STMT_EXPR) {
         return cursor->data.expr_stmt->result_type;
     } else if (cursor->stmt_type == STMT_VAL || cursor->stmt_type == STMT_VAR ||
-               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE) {
+               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE ||
+               cursor->stmt_type == STMT_FOR) {
         return TYPE_UNIT;
     } else if (cursor->stmt_type == STMT_IF) {
         if (cursor->data.if_stmt.else_stmt == NULL) {
@@ -597,6 +599,41 @@ static void check_command(statement_struct *command) {
         check_condition(command->data.while_lp.while_expr);
         check_block(command->data.while_lp.while_body);
         break;
+    case STMT_FOR:
+        check_expression(command->data.for_lp.from);
+        if (command->data.for_lp.from->result_type != TYPE_INT) {
+            error_exit(ERR_SEM_TYPE, command->line, "'from' has to have type INT!");
+        }
+        check_expression(command->data.for_lp.to);
+        if (command->data.for_lp.to->result_type != TYPE_INT) {
+            error_exit(ERR_SEM_TYPE, command->line, "'to' has to have type INT");
+        }
+        if (command->data.for_lp.step != NULL) {
+            check_expression(command->data.for_lp.step);
+            if (command->data.for_lp.step->result_type != TYPE_INT) {
+                error_exit(ERR_SEM_TYPE, command->line, "'step' has to have type INT");
+            } else if (command->data.for_lp.step->node_type == EXPR_LIT_INT &&
+                       command->data.for_lp.step->data.lit_int == 0) {
+                error_exit(ERR_SEM_OTHER, command->line, "'step' cannot be 0!");
+            }
+        }
+        push_scope();
+        attr.symbol = variable;
+        attr.value_modif = nonmodif_val;
+        attr.data_type = int_dt;
+        attr.codegen_id = codegen_next;
+        command->data.for_lp.codegen_id = codegen_next;
+        codegen_next++;
+        status = insert_hash(scope_hash, command->data.for_lp.id_name, &attr);
+        if (status == insert_fail) {
+            error_exit(ERR_INTERNAL, command->line, "Insert hashtable failed!");
+        }
+        if (command->data.for_lp.guard != NULL) {
+            check_condition(command->data.for_lp.guard);
+        }
+        check_block(command->data.for_lp.body);
+        pop_scope();
+        break;
     }
 }
 
@@ -654,6 +691,7 @@ static void check_function(function_struct *func) {
             case STMT_VAL:
             case STMT_VAR:
             case STMT_ASSIGN:
+            case STMT_FOR:
             case STMT_WHILE:
                 error_exit(ERR_SEM_TYPE, last_stmt->line, "Return type is not Unit!");
                 break;
@@ -678,6 +716,7 @@ static void check_function(function_struct *func) {
         case STMT_VAR:
         case STMT_WHILE:
         case STMT_ASSIGN:
+        case STMT_FOR:
             derived_type = TYPE_UNIT;
             break;
         case STMT_IF:
