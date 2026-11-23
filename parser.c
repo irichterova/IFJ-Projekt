@@ -476,7 +476,11 @@ static statement_struct *parse_while(void) {
  */
 static statement_struct *parse_for(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_FOR);
-    next_token(EOL_FORBIDDEN);
+    next_token(EOL_OPTIONAL);
+    bool multiline = token.after_eol;
+    if (multiline) {
+        type_t_check(TOKEN_INDENT, EOL_FORBIDDEN);
+    }
     if (token.type == TOKEN_IDENTIFIER) {
         stmt->data.for_lp.id_name = token.data.id;
     } else {
@@ -507,7 +511,8 @@ static statement_struct *parse_for(void) {
         stmt->data.for_lp.step = parse_expr(token, &token);
     }
     expr_struct *guard;
-    while (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF && !token.after_eol) {
+    while (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF &&
+           token.after_eol == multiline) {
         next_token(EOL_FORBIDDEN);
         guard = parse_expr(token, &token);
         if (stmt->data.for_lp.guard == NULL) {
@@ -525,6 +530,11 @@ static statement_struct *parse_for(void) {
             new_guard->result_type = TYPE_UNKNOWN;
             stmt->data.for_lp.guard = new_guard;
         }
+    }
+    if (multiline) {
+        type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
+    } else if (token.after_eol) {
+        error_exit(ERR_SYN, stmt->line, "Token 'do' cannot be on new line!");
     }
     keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
     stmt->data.for_lp.body = parse_branch_body(false);
