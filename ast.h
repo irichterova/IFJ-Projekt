@@ -20,7 +20,8 @@ typedef enum {
     EXPR_BIN_OP,
     EXPR_CALL_FUNC,
     EXPR_LIT_TRUE,
-    EXPR_LIT_FALSE
+    EXPR_LIT_FALSE,
+    EXPR_IF
 } expr_node_type;
 
 typedef enum {
@@ -146,6 +147,7 @@ typedef union {
     unary_operator unary_op;
     binary_operator binary_op;
     call_function call_fn;
+    if_statement if_stmt;
 } expr_data;
 
 typedef struct expr_struct {

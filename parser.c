@@ -15,6 +15,7 @@ static token_t token;
 static void parse_params_next(function_struct *func);
 static statement_struct *parse_while(void);
 static statement_struct *parse_if(void);
+static expr_struct *parse_expr_or_if(void);
 
 /**
  * @brief selects next token from scanner
@@ -228,7 +229,7 @@ static statement_struct *parse_def_var(void) {
     }
     stmt->data.var_stmt.declared_type = parse_optional_type();
     type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
-    stmt->data.var_stmt.init_expr = parse_expr(token, &token);
+    stmt->data.var_stmt.init_expr = parse_expr_or_if();
     return stmt;
 }
 
@@ -240,7 +241,7 @@ static statement_struct *parse_return(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_RETURN);
     next_token(EOL_OPTIONAL);
     if (!token.after_eol && token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT) {
-        stmt->data.ret_stmt = parse_expr(token, &token);
+        stmt->data.ret_stmt = parse_expr_or_if();
     }
     return stmt;
 }
@@ -257,7 +258,7 @@ static statement_struct *parse_statement_id(token_t id_token, int line) {
         stmt = create_stmt(line, STMT_ASSIGN);
         stmt->data.id_stmt.id_name = id_token.data.id;
         next_token(EOL_FORBIDDEN);
-        stmt->data.id_stmt.assign_expr = parse_expr(token, &token);
+        stmt->data.id_stmt.assign_expr = parse_expr_or_if();
     } else {
         stmt = create_stmt(line, STMT_EXPR);
         stmt->data.expr_stmt = parse_expr_rest(id_token, token, &token);
@@ -301,13 +302,44 @@ static statement_struct *parse_statement(void) {
 }
 
 /**
+ * @brief checks whereas if ends with expression
+ * @param stmt if statement which we check
+ * @return if ends with expression returns true, if not returns false
+ */
+static bool ends_with_if_expr(statement_struct *stmt) {
+    expr_struct *expr = NULL;
+    switch (stmt->stmt_type) {
+    case STMT_VAL:
+    case STMT_VAR:
+        expr = stmt->data.var_stmt.init_expr;
+        break;
+    case STMT_ASSIGN:
+        expr = stmt->data.id_stmt.assign_expr;
+        break;
+    case STMT_RETURN:
+        expr = stmt->data.ret_stmt;
+        break;
+    case STMT_EXPR:
+        expr = stmt->data.expr_stmt;
+        break;
+    default:
+        return false;
+    }
+    if (expr != NULL && expr->node_type == EXPR_IF) {
+        return true;
+    }
+    return false;
+}
+
+/**
  * @brief checks syntax of remaining statements until dedent
  * @return rest of statement node, NULL if none
  */
 static statement_struct *parse_statement_next(void) {
     if (token.type != TOKEN_DEDENT) {
         statement_struct *stmt = parse_statement();
-        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE) {
+        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE &&
+            !ends_with_if_expr(stmt)) {
             parse_statement_end(false);
         }
         stmt->next = parse_statement_next();
@@ -323,7 +355,7 @@ static statement_struct *parse_statement_next(void) {
 static statement_struct *parse_block(void) {
     type_t_check(TOKEN_INDENT, EOL_OPTIONAL);
     statement_struct *stmt = parse_statement();
-    if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE) {
+    if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE && !ends_with_if_expr(stmt)) {
         parse_statement_end(false);
     }
     stmt->next = parse_statement_next();
@@ -343,7 +375,8 @@ static statement_struct *parse_branch_body(bool allow_else) {
         return stmt;
     } else {
         stmt = parse_statement();
-        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE) {
+        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE &&
+            !ends_with_if_expr(stmt)) {
             parse_statement_end(allow_else);
         }
         return stmt;
@@ -368,16 +401,55 @@ static statement_struct *parse_else(void) {
 }
 
 /**
+ * @brief checks syntax of if body
+ * @param if_data data of if statement
+ */
+static void parse_if_body(if_statement *if_data) {
+    next_token(EOL_FORBIDDEN);
+    if_data->if_expr = parse_expr(token, &token);
+    keyword_t_check(KEYWORD_THEN, EOL_OPTIONAL);
+    if_data->then_stmt = parse_branch_body(true);
+    if_data->else_stmt = parse_else();
+}
+
+/**
+ * @brief checks syntax of expression in if statement
+ * @returns struct of expression
+ */
+static expr_struct *parse_if_expr(void) {
+    expr_struct *expr = calloc(1, sizeof(expr_struct));
+    if (expr == NULL) {
+        error_exit(ERR_INTERNAL, get_line_number(), "Memory allocation failed!");
+    }
+    expr->line = get_line_number();
+    expr->node_type = EXPR_IF;
+    expr->result_type = TYPE_UNKNOWN;
+    parse_if_body(&expr->data.if_stmt);
+    if (expr->data.if_stmt.else_stmt == NULL) {
+        error_exit(ERR_SYN, expr->line, "Else statement is mandatory!");
+    }
+    return expr;
+}
+
+/**
+ * @brief checks syntax of expression or expression in if statement
+ * @returns struct of expression
+ */
+static expr_struct *parse_expr_or_if(void) {
+    if (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF) {
+        return parse_if_expr();
+    } else {
+        return parse_expr(token, &token);
+    }
+}
+
+/**
  * @brief checks syntax of statement if
  * @return statement node of if statement
  */
 static statement_struct *parse_if(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_IF);
-    next_token(EOL_FORBIDDEN);
-    stmt->data.if_stmt.if_expr = parse_expr(token, &token);
-    keyword_t_check(KEYWORD_THEN, EOL_OPTIONAL);
-    stmt->data.if_stmt.then_stmt = parse_branch_body(true);
-    stmt->data.if_stmt.else_stmt = parse_else();
+    parse_if_body(&stmt->data.if_stmt);
     return stmt;
 }
 
@@ -403,8 +475,9 @@ static statement_struct *parse_body(void) {
         return parse_block();
     } else {
         statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
-        stmt->data.expr_stmt = parse_expr(token, &token);
-        if (!token.after_eol && token.type != TOKEN_EOF) {
+        stmt->data.expr_stmt = parse_expr_or_if();
+        if (!token.after_eol && token.type != TOKEN_EOF &&
+            stmt->data.expr_stmt->node_type != EXPR_IF) {
             error_exit(ERR_SYN, get_line_number(), "Expected eol after function body!");
         }
         return stmt;
