@@ -87,11 +87,13 @@ static statement_struct *create_stmt(int line, statement_type type) {
 
 /**
  * @brief checks syntax of statement end, it needs to be semicolon or eol
+ * @param allow_else if there can be else statement
  */
-static void parse_statement_end(void) {
+static void parse_statement_end(bool allow_else) {
     if (token.type == TOKEN_SEMICOLON) {
         next_token(EOL_OPTIONAL);
-    } else if (!token.after_eol && token.type != TOKEN_DEDENT) {
+    } else if (!token.after_eol && token.type != TOKEN_DEDENT &&
+               !(allow_else && token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_ELSE)) {
         error_exit(ERR_SYN, get_line_number(), "Expected eol or semicolon after statement!");
     }
 }
@@ -227,7 +229,6 @@ static statement_struct *parse_def_var(void) {
     stmt->data.var_stmt.declared_type = parse_optional_type();
     type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
     stmt->data.var_stmt.init_expr = parse_expr(token, &token);
-    parse_statement_end();
     return stmt;
 }
 
@@ -241,7 +242,6 @@ static statement_struct *parse_return(void) {
     if (!token.after_eol && token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT) {
         stmt->data.ret_stmt = parse_expr(token, &token);
     }
-    parse_statement_end();
     return stmt;
 }
 
@@ -290,12 +290,10 @@ static statement_struct *parse_statement(void) {
             int line = get_line_number();
             next_token(EOL_OPTIONAL);
             statement_struct *stmt = parse_statement_id(id_token, line);
-            parse_statement_end();
             return stmt;
         } else {
             statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
             stmt->data.expr_stmt = parse_expr(token, &token);
-            parse_statement_end();
             return stmt;
         }
     }
@@ -309,6 +307,9 @@ static statement_struct *parse_statement(void) {
 static statement_struct *parse_statement_next(void) {
     if (token.type != TOKEN_DEDENT) {
         statement_struct *stmt = parse_statement();
+        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE) {
+            parse_statement_end(false);
+        }
         stmt->next = parse_statement_next();
         return stmt;
     }
@@ -322,9 +323,31 @@ static statement_struct *parse_statement_next(void) {
 static statement_struct *parse_block(void) {
     type_t_check(TOKEN_INDENT, EOL_OPTIONAL);
     statement_struct *stmt = parse_statement();
+    if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE) {
+        parse_statement_end(false);
+    }
     stmt->next = parse_statement_next();
     type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
     return stmt;
+}
+
+/**
+ * @brief checks syntax of branch in if body after else/then or in while loop
+ * @param allow_else if there can be else statement
+ * @return returns block of statements or oneline statement
+ */
+static statement_struct *parse_branch_body(bool allow_else) {
+    statement_struct *stmt;
+    if (token.after_eol) {
+        stmt = parse_block();
+        return stmt;
+    } else {
+        stmt = parse_statement();
+        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE) {
+            parse_statement_end(allow_else);
+        }
+        return stmt;
+    }
 }
 
 /**
@@ -339,7 +362,7 @@ static statement_struct *parse_else(void) {
         if (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF && !token.after_eol) {
             return parse_if();
         } else {
-            return parse_block();
+            return parse_branch_body(false);
         }
     }
 }
@@ -352,8 +375,8 @@ static statement_struct *parse_if(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_IF);
     next_token(EOL_FORBIDDEN);
     stmt->data.if_stmt.if_expr = parse_expr(token, &token);
-    keyword_t_check(KEYWORD_THEN, EOL_REQUIRED);
-    stmt->data.if_stmt.then_stmt = parse_block();
+    keyword_t_check(KEYWORD_THEN, EOL_OPTIONAL);
+    stmt->data.if_stmt.then_stmt = parse_branch_body(true);
     stmt->data.if_stmt.else_stmt = parse_else();
     return stmt;
 }
@@ -366,8 +389,8 @@ static statement_struct *parse_while(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_WHILE);
     next_token(EOL_FORBIDDEN);
     stmt->data.while_lp.while_expr = parse_expr(token, &token);
-    keyword_t_check(KEYWORD_DO, EOL_REQUIRED);
-    stmt->data.while_lp.while_body = parse_block();
+    keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
+    stmt->data.while_lp.while_body = parse_branch_body(false);
     return stmt;
 }
 
