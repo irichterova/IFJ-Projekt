@@ -3,7 +3,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 *
 @file generator.c
 *
-@date 18-11-2026
+@date 25-11-2026
 @author xdongop00 Phuong Uyen Dongova
 */
 #include "generator.h"
@@ -23,6 +23,7 @@ void gen_function(function_struct* function);
 void gen_statement(statement_struct* statement);
 void gen_expression(expr_struct* expression);
 
+void emit_defvar_expr(expr_struct *expression);
 /* INT2FLOATS conversion */
 void int2float(value_type first_type, value_type second_type);
 
@@ -189,6 +190,16 @@ void emit_defvar(statement_struct *statement)
             case STMT_VAL:
             case STMT_VAR:
                 newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+                emit_defvar_expr(statement->data.var_stmt.init_expr);
+                break;
+            case STMT_ASSIGN:
+                emit_defvar_expr(statement->data.id_stmt.assign_expr);
+                break;
+            case STMT_RETURN:
+                emit_defvar_expr(statement->data.ret_stmt);
+                break;
+            case STMT_EXPR:
+                emit_defvar_expr(statement->data.expr_stmt);
                 break;
             /*In cycles / statements with a body, generate variables from all parts of the body */
             case STMT_IF:
@@ -198,11 +209,54 @@ void emit_defvar(statement_struct *statement)
             case STMT_WHILE:
                 emit_defvar(statement->data.while_lp.while_body);
                 break; 
+            /* In for loop cycle also generate defvar for variables used in the loop -> for(int id_name; i < end; i+= step) along with the body */
+            case STMT_FOR:
+                newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.for_lp.id_name, statement->data.for_lp.codegen_id);
+                newline_emit_expr("DEFVAR LF@$end$%zu", statement->data.for_lp.codegen_id);
+                newline_emit_expr("DEFVAR LF@$step$%zu", statement->data.for_lp.codegen_id);
+                emit_defvar(statement->data.for_lp.body);
+                break;
             default:
             break;           
         }
         /* Move the pointer of a current statement to the following statement */
         statement = statement->next;
+    }
+}
+/**
+ * @brief   Generate variables that are created inside of the body of an if expression
+ * @param   expression Valid pointer to a possible if expression
+ */
+void emit_defvar_expr(expr_struct *expression)
+{
+    if(expression != NULL && expression->node_type == EXPR_IF)
+    {
+        emit_defvar(expression->data.if_stmt.then_stmt);
+        emit_defvar(expression->data.if_stmt.else_stmt);
+    }
+}
+/**
+ * @brief   Function that leaves one return value of the last expression on the stack, used for loops
+ * @param   expr   Pointer to a last expression in a statement
+ * @param   expect Expected return value of the expression, used for checking int2float conversion
+ */
+void gen_expr_return(statement_struct *expr, value_type expect_ret)
+{
+    for(statement_struct *stmt = expr; stmt != NULL; stmt=stmt->next)
+    {
+        if(stmt->next == NULL && stmt->stmt_type == STMT_EXPR)
+        {
+            gen_expression(stmt->data.expr_stmt);
+            int2float(stmt->data.expr_stmt->result_type, expect_ret);
+        }
+        else
+        {
+            gen_statement(stmt);
+            if(stmt->next == NULL)
+            {
+                newline_emit_expr("PUSHS nil@nil");
+            }
+        }
     }
 }
 /**
@@ -248,10 +302,10 @@ void gen_expression(expr_struct* expression)
             emit_expr("\n");
             break;
         case EXPR_LIT_TRUE:
-            emit_expr("%s bool@true", msg);
+            newline_emit_expr("%s bool@true", msg);
             break;
         case EXPR_LIT_FALSE:
-            emit_expr("%s bool@false", msg);
+            newline_emit_expr("%s bool@false", msg);
             break;
         /* Variables must be defined before and generated in emit_defvar - pushing defined local frame variable on a stack */
         case EXPR_VARIABLE:
@@ -302,12 +356,12 @@ void gen_expression(expr_struct* expression)
                 int logic_count = ++cycle_counter;
                 gen_expression(left_op);
                 newline_emit_expr("%s bool@%s", msg, bool_res);
-                newline_emit_expr("JUMPIFEQS $skip_right_op_%i", logic_count);
+                newline_emit_expr("JUMPIFEQS skip_right_op_%i", logic_count);
                 gen_expression(right_op);
-                newline_emit_expr("JUMP $end_logic_op_%i", logic_count);
-                newline_emit_expr("LABEL $skip_right_op_%i", logic_count);
+                newline_emit_expr("JUMP end_logic_op_%i", logic_count);
+                newline_emit_expr("LABEL skip_right_op_%i", logic_count);
                 newline_emit_expr("%s bool@%s", msg, bool_res);
-                newline_emit_expr("LABEL $end_logic_op_%i", logic_count);
+                newline_emit_expr("LABEL end_logic_op_%i", logic_count);
                 break;
             }
             value_type left_type = left_op->result_type;
@@ -373,8 +427,6 @@ void gen_expression(expr_struct* expression)
                     newline_emit_expr("EQS");
                     newline_emit_expr("NOTS");
                     break;
-                case OP_AND:
-                    
                 default:
                 break;
             }
@@ -405,13 +457,25 @@ void gen_expression(expr_struct* expression)
             (strcmp(expr_fn_name, "strLength") == 0) ||
             (strcmp(expr_fn_name, "subStr") == 0) ||
             (strcmp(expr_fn_name, "ord") == 0) ||
-            (strcmp(expr_fn_name, "chr") == 0))
+            (strcmp(expr_fn_name, "chr") == 0) ||
+            (strcmp(expr_fn_name, "readBoolean") == 0))
             {
                 newline_emit_expr("CALL fn_$builtin_%s", expr_fn_name);
             }
             else
             newline_emit_expr("CALL fn_%s", expr_fn_name);
-
+            break;
+            case EXPR_IF:
+            int if_expr_counter = ++cycle_counter;
+            expr_struct *if_expr = expression->data.if_stmt.if_expr;
+            gen_expression(if_expr);
+            newline_emit_expr("PUSHS bool@false");
+            newline_emit_expr("JUMPIFEQS if_expr_else_%i", if_expr_counter);
+            gen_expr_return(expression->data.if_stmt.then_stmt, expression->result_type);
+            newline_emit_expr("JUMP if_expr_end_%i", if_expr_counter);
+            newline_emit_expr("LABEL if_expr_else_%i", if_expr_counter);
+            gen_expr_return(expression->data.if_stmt.else_stmt, expression->result_type);
+            newline_emit_expr("LABEL if_expr_end_%i", if_expr_counter);
             break;
         default:
         break;
@@ -521,7 +585,87 @@ void gen_statement(statement_struct* statement)
 
             newline_emit_expr("LABEL end_while_%i", while_counter); 
             break;
-        }          
+        }
+        case STMT_FOR:
+        {
+            int for_counter = ++cycle_counter;
+            char *loop_name = statement->data.for_lp.id_name;
+            size_t lp_codegen = statement->data.for_lp.codegen_id;
+
+            /* Get all starting values of a loop - start, end */
+            gen_expression(statement->data.for_lp.from);
+            newline_emit_expr("%s LF@%s$%zu", msg, loop_name, lp_codegen);
+            gen_expression(statement->data.for_lp.to);
+            newline_emit_expr("%s LF@$end$%zu", msg, lp_codegen);
+
+            /* If the starting step is not defined, set it to 1*/
+            if(statement->data.for_lp.step != NULL)
+            {
+                gen_expression(statement->data.for_lp.step);
+            }
+            else
+            {
+                newline_emit_expr("PUSHS int@1");
+            }
+            newline_emit_expr("%s LF@$step$%zu", msg, lp_codegen);
+
+            /* Check if the step is set to zero - infinite loop, end with error code 40 */
+            newline_emit_expr("JUMPIFNEQ for_step_ok_%i LF@$step$%zu int@0", for_counter, lp_codegen);
+            newline_emit_expr("EXIT int@40");
+            newline_emit_expr("LABEL for_step_ok_%i", for_counter);
+
+            /* Check if the step is positive or negative - decides the loop condition */
+            newline_emit_expr("LABEL for_loop_%i", for_counter);
+            newline_emit_expr("GT LF@$trash LF@$step$%zu int@0", lp_codegen);
+            newline_emit_expr("JUMPIFEQ for_negative_%i LF@$trash bool@false", for_counter);
+
+            /* If the step is forward - positive, end the loop if we passed the end value */
+            if(statement->data.for_lp.inclusive)
+            {
+                newline_emit_expr("GT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@true", for_counter);
+            }
+            else
+            {
+                newline_emit_expr("LT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@false", for_counter);
+            }
+            newline_emit_expr("JUMP for_body_%i", for_counter);
+
+            /* If the step is negative, end the loop if we reach below the end value */
+            newline_emit_expr("LABEL for_negative_%i", for_counter);
+            if(statement->data.for_lp.inclusive)
+            {
+                newline_emit_expr("LT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@true", for_counter);
+            }
+            else
+            {
+                newline_emit_expr("GT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@false", for_counter);
+            }
+
+            newline_emit_expr("LABEL for_body_%i", for_counter);
+            
+            /* Check guard - the condition inside a for loop, if the condition is false, skip the body of the loop */
+            if(statement->data.for_lp.guard != NULL)
+            {
+                gen_expression(statement->data.for_lp.guard);
+                newline_emit_expr("PUSHS bool@false");
+                newline_emit_expr("JUMPIFEQS for_next_%i", for_counter);
+            }
+            /* Generate the body */
+            for(statement_struct *stmt = statement->data.for_lp.body; stmt != NULL; stmt = stmt->next)
+            {
+                gen_statement(stmt);
+            }
+            newline_emit_expr("LABEL for_next_%i", for_counter);
+            /* Add the step to the current loop variable and jump back in the loop */
+            newline_emit_expr("ADD LF@%s$%zu LF@%s$%zu LF@$step$%zu", loop_name, lp_codegen, loop_name, lp_codegen, lp_codegen);
+            newline_emit_expr("JUMP for_loop_%i", for_counter);
+            newline_emit_expr("LABEL for_end_%i", for_counter);
+            break;
+        }
         default:
         break;   
     }
@@ -817,7 +961,7 @@ void read_int()
 /*  Same as read int but instead of int, read type bool */
 void read_bool()
 {
-    char *builtin_name = "$builtin_readInt";
+    char *builtin_name = "$builtin_readBoolean";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$val");
