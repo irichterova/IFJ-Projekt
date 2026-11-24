@@ -206,6 +206,30 @@ void emit_defvar(statement_struct *statement)
     }
 }
 /**
+ * @brief   Function that leaves one return value of the last expression on the stack, used for loops
+ * @param   expr   Pointer to a last expression in a statement
+ * @param   expect Expected return value of the expression, used for checking int2float conversion
+ */
+void gen_expr_return(statement_struct *expr, value_type expect_ret)
+{
+    for(statement_struct *stmt = expr; stmt != NULL; stmt=stmt->next)
+    {
+        if(stmt->next == NULL && stmt->stmt_type == STMT_EXPR)
+        {
+            gen_expression(stmt->data.expr_stmt);
+            int2float(stmt->data.expr_stmt->result_type, expect_ret);
+        }
+        else
+        {
+            gen_statement(stmt);
+            if(stmt->next == NULL)
+            {
+                newline_emit_expr("PUSHS nil@nil");
+            }
+        }
+    }
+}
+/**
  * @brief   Function that finds a function in a program by the name 
  * @param   func_name   Name of the function we are trying to find
  * @return  func    Pointer to a function with a matched name 
@@ -409,7 +433,18 @@ void gen_expression(expr_struct* expression)
             }
             else
             newline_emit_expr("CALL fn_%s", expr_fn_name);
-
+            break;
+            case EXPR_IF:
+            int if_expr_counter = ++cycle_counter;
+            expr_struct *if_expr = expression->data.if_stmt.if_expr;
+            gen_expression(if_expr);
+            newline_emit_expr("PUSHS bool@false");
+            newline_emit_expr("JUMPIFEQS if_expr_else_%i", if_expr_counter);
+            gen_expr_return(expression->data.if_stmt.then_stmt, expression->result_type);
+            newline_emit_expr("JUMP if_expr_end_%i", if_expr_counter);
+            newline_emit_expr("LABEL if_expr_else_%i", if_expr_counter);
+            gen_expr_return(expression->data.if_stmt.else_stmt, expression->result_type);
+            newline_emit_expr("LABEL if_expr_end_%s", if_expr_counter);
             break;
         default:
         break;
