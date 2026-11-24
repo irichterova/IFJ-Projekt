@@ -6,8 +6,8 @@
 
 #include "parser.h"
 #include "error.h"
-#include "scanner.h"
 #include "expression.h"
+#include "scanner.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +15,8 @@ static token_t token;
 static void parse_params_next(function_struct *func);
 static statement_struct *parse_while(void);
 static statement_struct *parse_if(void);
+static expr_struct *parse_expr_or_if(void);
+static statement_struct *parse_for(void);
 
 /**
  * @brief selects next token from scanner
@@ -87,11 +89,13 @@ static statement_struct *create_stmt(int line, statement_type type) {
 
 /**
  * @brief checks syntax of statement end, it needs to be semicolon or eol
+ * @param allow_else if there can be else statement
  */
-static void parse_statement_end(void) {
+static void parse_statement_end(bool allow_else) {
     if (token.type == TOKEN_SEMICOLON) {
         next_token(EOL_OPTIONAL);
-    } else if (!token.after_eol && token.type != TOKEN_DEDENT) {
+    } else if (!token.after_eol && token.type != TOKEN_DEDENT &&
+               !(allow_else && token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_ELSE)) {
         error_exit(ERR_SYN, get_line_number(), "Expected eol or semicolon after statement!");
     }
 }
@@ -116,6 +120,9 @@ static value_type parse_type(enum eol_rules eol) {
         case KEYWORD_UNIT:
             next_token(eol);
             return TYPE_UNIT;
+        case KEYWORD_BOOLEAN:
+            next_token(eol);
+            return TYPE_BOOL;
         default:
             error_exit(ERR_SYN, get_line_number(), "Token type doesn't match any type!");
         }
@@ -223,8 +230,7 @@ static statement_struct *parse_def_var(void) {
     }
     stmt->data.var_stmt.declared_type = parse_optional_type();
     type_t_check(TOKEN_ASSIGN, EOL_FORBIDDEN);
-    stmt->data.var_stmt.init_expr = parse_expr(token, &token);
-    parse_statement_end();
+    stmt->data.var_stmt.init_expr = parse_expr_or_if();
     return stmt;
 }
 
@@ -236,9 +242,8 @@ static statement_struct *parse_return(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_RETURN);
     next_token(EOL_OPTIONAL);
     if (!token.after_eol && token.type != TOKEN_SEMICOLON && token.type != TOKEN_DEDENT) {
-        stmt->data.ret_stmt = parse_expr(token, &token);
+        stmt->data.ret_stmt = parse_expr_or_if();
     }
-    parse_statement_end();
     return stmt;
 }
 
@@ -254,7 +259,7 @@ static statement_struct *parse_statement_id(token_t id_token, int line) {
         stmt = create_stmt(line, STMT_ASSIGN);
         stmt->data.id_stmt.id_name = id_token.data.id;
         next_token(EOL_FORBIDDEN);
-        stmt->data.id_stmt.assign_expr = parse_expr(token, &token);
+        stmt->data.id_stmt.assign_expr = parse_expr_or_if();
     } else {
         stmt = create_stmt(line, STMT_EXPR);
         stmt->data.expr_stmt = parse_expr_rest(id_token, token, &token);
@@ -278,6 +283,8 @@ static statement_struct *parse_statement(void) {
             return parse_while();
         case KEYWORD_IF:
             return parse_if();
+        case KEYWORD_FOR:
+            return parse_for();
         default:
             error_exit(ERR_SYN, get_line_number(), "Unexpected keyword!");
         }
@@ -287,16 +294,44 @@ static statement_struct *parse_statement(void) {
             int line = get_line_number();
             next_token(EOL_OPTIONAL);
             statement_struct *stmt = parse_statement_id(id_token, line);
-            parse_statement_end();
             return stmt;
         } else {
             statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
             stmt->data.expr_stmt = parse_expr(token, &token);
-            parse_statement_end();
             return stmt;
         }
     }
     return NULL;
+}
+
+/**
+ * @brief checks whereas if ends with expression
+ * @param stmt if statement which we check
+ * @return if ends with expression returns true, if not returns false
+ */
+static bool ends_with_if_expr(statement_struct *stmt) {
+    expr_struct *expr = NULL;
+    switch (stmt->stmt_type) {
+    case STMT_VAL:
+    case STMT_VAR:
+        expr = stmt->data.var_stmt.init_expr;
+        break;
+    case STMT_ASSIGN:
+        expr = stmt->data.id_stmt.assign_expr;
+        break;
+    case STMT_RETURN:
+        expr = stmt->data.ret_stmt;
+        break;
+    case STMT_EXPR:
+        expr = stmt->data.expr_stmt;
+        break;
+    default:
+        return false;
+    }
+    if (expr != NULL && expr->node_type == EXPR_IF) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -306,6 +341,10 @@ static statement_struct *parse_statement(void) {
 static statement_struct *parse_statement_next(void) {
     if (token.type != TOKEN_DEDENT) {
         statement_struct *stmt = parse_statement();
+        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE &&
+            !ends_with_if_expr(stmt) && stmt->stmt_type != STMT_FOR) {
+            parse_statement_end(false);
+        }
         stmt->next = parse_statement_next();
         return stmt;
     }
@@ -319,9 +358,33 @@ static statement_struct *parse_statement_next(void) {
 static statement_struct *parse_block(void) {
     type_t_check(TOKEN_INDENT, EOL_OPTIONAL);
     statement_struct *stmt = parse_statement();
+    if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE && !ends_with_if_expr(stmt) &&
+        stmt->stmt_type != STMT_FOR) {
+        parse_statement_end(false);
+    }
     stmt->next = parse_statement_next();
     type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
     return stmt;
+}
+
+/**
+ * @brief checks syntax of branch in if body after else/then or in while loop
+ * @param allow_else if there can be else statement
+ * @return returns block of statements or oneline statement
+ */
+static statement_struct *parse_branch_body(bool allow_else) {
+    statement_struct *stmt;
+    if (token.after_eol) {
+        stmt = parse_block();
+        return stmt;
+    } else {
+        stmt = parse_statement();
+        if (stmt->stmt_type != STMT_IF && stmt->stmt_type != STMT_WHILE &&
+            !ends_with_if_expr(stmt) && stmt->stmt_type != STMT_FOR) {
+            parse_statement_end(allow_else);
+        }
+        return stmt;
+    }
 }
 
 /**
@@ -329,8 +392,59 @@ static statement_struct *parse_block(void) {
  * @return block of else statement
  */
 static statement_struct *parse_else(void) {
-    keyword_t_check(KEYWORD_ELSE, EOL_REQUIRED);
-    return parse_block();
+    if (token.type != TOKEN_KEYWORD || token.data.keyword != KEYWORD_ELSE) {
+        return NULL;
+    } else {
+        next_token(EOL_OPTIONAL);
+        if (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF && !token.after_eol) {
+            return parse_if();
+        } else {
+            return parse_branch_body(false);
+        }
+    }
+}
+
+/**
+ * @brief checks syntax of if body
+ * @param if_data data of if statement
+ */
+static void parse_if_body(if_statement *if_data) {
+    next_token(EOL_FORBIDDEN);
+    if_data->if_expr = parse_expr(token, &token);
+    keyword_t_check(KEYWORD_THEN, EOL_OPTIONAL);
+    if_data->then_stmt = parse_branch_body(true);
+    if_data->else_stmt = parse_else();
+}
+
+/**
+ * @brief checks syntax of expression in if statement
+ * @returns struct of expression
+ */
+static expr_struct *parse_if_expr(void) {
+    expr_struct *expr = calloc(1, sizeof(expr_struct));
+    if (expr == NULL) {
+        error_exit(ERR_INTERNAL, get_line_number(), "Memory allocation failed!");
+    }
+    expr->line = get_line_number();
+    expr->node_type = EXPR_IF;
+    expr->result_type = TYPE_UNKNOWN;
+    parse_if_body(&expr->data.if_stmt);
+    if (expr->data.if_stmt.else_stmt == NULL) {
+        error_exit(ERR_SYN, expr->line, "Else statement is mandatory!");
+    }
+    return expr;
+}
+
+/**
+ * @brief checks syntax of expression or expression in if statement
+ * @returns struct of expression
+ */
+static expr_struct *parse_expr_or_if(void) {
+    if (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF) {
+        return parse_if_expr();
+    } else {
+        return parse_expr(token, &token);
+    }
 }
 
 /**
@@ -339,11 +453,7 @@ static statement_struct *parse_else(void) {
  */
 static statement_struct *parse_if(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_IF);
-    next_token(EOL_FORBIDDEN);
-    stmt->data.if_stmt.if_expr = parse_expr(token, &token);
-    keyword_t_check(KEYWORD_THEN, EOL_REQUIRED);
-    stmt->data.if_stmt.then_stmt = parse_block();
-    stmt->data.if_stmt.else_stmt = parse_else();
+    parse_if_body(&stmt->data.if_stmt);
     return stmt;
 }
 
@@ -355,8 +465,79 @@ static statement_struct *parse_while(void) {
     statement_struct *stmt = create_stmt(get_line_number(), STMT_WHILE);
     next_token(EOL_FORBIDDEN);
     stmt->data.while_lp.while_expr = parse_expr(token, &token);
-    keyword_t_check(KEYWORD_DO, EOL_REQUIRED);
-    stmt->data.while_lp.while_body = parse_block();
+    keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
+    stmt->data.while_lp.while_body = parse_branch_body(false);
+    return stmt;
+}
+
+/**
+ * @brief checks syntax of for loop
+ * @return statement of for loop
+ */
+static statement_struct *parse_for(void) {
+    statement_struct *stmt = create_stmt(get_line_number(), STMT_FOR);
+    next_token(EOL_OPTIONAL);
+    bool multiline = token.after_eol;
+    if (multiline) {
+        type_t_check(TOKEN_INDENT, EOL_FORBIDDEN);
+    }
+    if (token.type == TOKEN_IDENTIFIER) {
+        stmt->data.for_lp.id_name = token.data.id;
+    } else {
+        error_exit(ERR_SYN, get_line_number(), "After for must be identifier!");
+    }
+    next_token(EOL_FORBIDDEN);
+    type_t_check(TOKEN_GENERATOR_ARROW, EOL_FORBIDDEN);
+    stmt->data.for_lp.from = parse_expr(token, &token);
+    if (token.type == TOKEN_IDENTIFIER) {
+        if (strcmp(token.data.id, "to") == 0) {
+            stmt->data.for_lp.inclusive = true;
+            free(token.data.id);
+            next_token(EOL_FORBIDDEN);
+        } else if (strcmp(token.data.id, "until") == 0) {
+            stmt->data.for_lp.inclusive = false;
+            free(token.data.id);
+            next_token(EOL_FORBIDDEN);
+        } else {
+            error_exit(ERR_SYN, get_line_number(), "Token must be 'to' or 'until'!");
+        }
+    } else {
+        error_exit(ERR_SYN, get_line_number(), "Token must be identifier!");
+    }
+    stmt->data.for_lp.to = parse_expr(token, &token);
+    if (token.type == TOKEN_IDENTIFIER && (strcmp(token.data.id, "by") == 0)) {
+        free(token.data.id);
+        next_token(EOL_FORBIDDEN);
+        stmt->data.for_lp.step = parse_expr(token, &token);
+    }
+    expr_struct *guard;
+    while (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF &&
+           token.after_eol == multiline) {
+        next_token(EOL_FORBIDDEN);
+        guard = parse_expr(token, &token);
+        if (stmt->data.for_lp.guard == NULL) {
+            stmt->data.for_lp.guard = guard;
+        } else {
+            expr_struct *new_guard = calloc(1, sizeof(expr_struct));
+            if (new_guard == NULL) {
+                error_exit(ERR_INTERNAL, stmt->line, "Memory allocation failed!");
+            }
+            new_guard->node_type = EXPR_BIN_OP;
+            new_guard->data.binary_op.op_type = OP_AND;
+            new_guard->data.binary_op.left_operand = stmt->data.for_lp.guard;
+            new_guard->data.binary_op.right_operand = guard;
+            new_guard->line = stmt->line;
+            new_guard->result_type = TYPE_UNKNOWN;
+            stmt->data.for_lp.guard = new_guard;
+        }
+    }
+    if (multiline) {
+        type_t_check(TOKEN_DEDENT, EOL_OPTIONAL);
+    } else if (token.after_eol) {
+        error_exit(ERR_SYN, stmt->line, "Token 'do' cannot be on new line!");
+    }
+    keyword_t_check(KEYWORD_DO, EOL_OPTIONAL);
+    stmt->data.for_lp.body = parse_branch_body(false);
     return stmt;
 }
 
@@ -369,8 +550,9 @@ static statement_struct *parse_body(void) {
         return parse_block();
     } else {
         statement_struct *stmt = create_stmt(get_line_number(), STMT_EXPR);
-        stmt->data.expr_stmt = parse_expr(token, &token);
-        if (!token.after_eol && token.type != TOKEN_EOF) {
+        stmt->data.expr_stmt = parse_expr_or_if();
+        if (!token.after_eol && token.type != TOKEN_EOF &&
+            stmt->data.expr_stmt->node_type != EXPR_IF) {
             error_exit(ERR_SYN, get_line_number(), "Expected eol after function body!");
         }
         return stmt;
