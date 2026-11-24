@@ -302,10 +302,10 @@ void gen_expression(expr_struct* expression)
             emit_expr("\n");
             break;
         case EXPR_LIT_TRUE:
-            emit_expr("%s bool@true", msg);
+            newline_emit_expr("%s bool@true", msg);
             break;
         case EXPR_LIT_FALSE:
-            emit_expr("%s bool@false", msg);
+            newline_emit_expr("%s bool@false", msg);
             break;
         /* Variables must be defined before and generated in emit_defvar - pushing defined local frame variable on a stack */
         case EXPR_VARIABLE:
@@ -457,7 +457,8 @@ void gen_expression(expr_struct* expression)
             (strcmp(expr_fn_name, "strLength") == 0) ||
             (strcmp(expr_fn_name, "subStr") == 0) ||
             (strcmp(expr_fn_name, "ord") == 0) ||
-            (strcmp(expr_fn_name, "chr") == 0))
+            (strcmp(expr_fn_name, "chr") == 0) ||
+            (strcmp(expr_fn_name, "readBoolean") == 0))
             {
                 newline_emit_expr("CALL fn_$builtin_%s", expr_fn_name);
             }
@@ -474,7 +475,7 @@ void gen_expression(expr_struct* expression)
             newline_emit_expr("JUMP if_expr_end_%i", if_expr_counter);
             newline_emit_expr("LABEL if_expr_else_%i", if_expr_counter);
             gen_expr_return(expression->data.if_stmt.else_stmt, expression->result_type);
-            newline_emit_expr("LABEL if_expr_end_%s", if_expr_counter);
+            newline_emit_expr("LABEL if_expr_end_%i", if_expr_counter);
             break;
         default:
         break;
