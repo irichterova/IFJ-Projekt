@@ -23,6 +23,7 @@ void gen_function(function_struct* function);
 void gen_statement(statement_struct* statement);
 void gen_expression(expr_struct* expression);
 
+void emit_defvar_expr(expr_struct *expression);
 /* INT2FLOATS conversion */
 void int2float(value_type first_type, value_type second_type);
 
@@ -189,6 +190,16 @@ void emit_defvar(statement_struct *statement)
             case STMT_VAL:
             case STMT_VAR:
                 newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.var_stmt.id_name, statement->data.var_stmt.codegen_id);
+                emit_defvar_expr(statement->data.var_stmt.init_expr);
+                break;
+            case STMT_ASSIGN:
+                emit_defvar_expr(statement->data.id_stmt.assign_expr);
+                break;
+            case STMT_RETURN:
+                emit_defvar_expr(statement->data.ret_stmt);
+                break;
+            case STMT_EXPR:
+                emit_defvar_expr(statement->data.expr_stmt);
                 break;
             /*In cycles / statements with a body, generate variables from all parts of the body */
             case STMT_IF:
@@ -203,6 +214,18 @@ void emit_defvar(statement_struct *statement)
         }
         /* Move the pointer of a current statement to the following statement */
         statement = statement->next;
+    }
+}
+/**
+ * @brief   Generate variables that are created inside of the body of an if expression
+ * @param   expression Valid pointer to a possible if expression
+ */
+void emit_defvar_expr(expr_struct *expression)
+{
+    if(expression != NULL && expression->node_type == EXPR_IF)
+    {
+        emit_defvar(expression->data.if_stmt.then_stmt);
+        emit_defvar(expression->data.if_stmt.else_stmt);
     }
 }
 /**
