@@ -5,6 +5,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include "expression.h"
 #include "error.h"
 
@@ -126,6 +127,9 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
 
         case TOKEN_L_PARENTH:
             return PSA_LEFT_P;
+        case TOKEN_PERIOD:
+            // Handle valmem
+            return PSA_MEMBER;
         case TOKEN_R_PARENTH:
             if (depth == 0) {
                 return PSA_START_END; // $
@@ -135,7 +139,7 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
         case TOKEN_OP_SUB:
             // Scanner doesn't distinguish unary and binary minus
             // So we do it ourselves
-            if (prev == PSA_ID || prev == PSA_RIGHT_P) {
+            if (prev == PSA_ID || prev == PSA_RIGHT_P || prev == PSA_MEMBER) {
                 return PSA_SUB;
             }
             return PSA_UNARY_MINUS;
@@ -447,7 +451,43 @@ static void reduce(PSA_Stack *stack) {
         node->node_type = EXPR_LIT_UNIT;
         node->result_type = TYPE_UNIT;
     }
-    
+
+    // E -> E.m
+    else if (count == 2 && handle[1].item_symbol == PSA_E && handle[0].item_symbol == PSA_MEMBER) {
+        line = handle[0].line;
+        node->node_type = EXPR_CALL_FUNC;
+        node->result_type = TYPE_UNKNOWN;
+        const char *fn_name = NULL; // Temp var to store name
+        // Check for literals and react accordingly
+        if (strcmp(handle[0].item_token.data.id, "toString") == 0) {
+            fn_name = "toStr";
+        } else if (strcmp(handle[0].item_token.data.id, "toInt") == 0) {
+            fn_name = "toInt";
+        } else if (strcmp(handle[0].item_token.data.id, "floor") == 0) {
+            fn_name = "$floor";
+        } else if (strcmp(handle[0].item_token.data.id, "length") == 0) {
+            fn_name = "strLength";
+        } else {
+            error_exit(ERR_SYN, line, "Unsupported member '%s'!", handle[0].item_token.data.id);
+        }
+        node->data.call_fn.name = malloc(strlen(fn_name) + 1);
+        if (node->data.call_fn.name == NULL) {
+            error_exit(ERR_INTERNAL, line, "Failed to allocate memory to function name!");
+        }
+        strcpy(node->data.call_fn.name, fn_name);
+
+        node->data.call_fn.args = malloc(sizeof(expr_struct *));
+        if (node->data.call_fn.args == NULL) {
+            error_exit(ERR_INTERNAL, line, "Failed to allocate memory to function args!");
+        }
+
+        // The value before '.' becomes the only argument, x.length -> strLength(x)
+        node->data.call_fn.args[0] = handle[1].subtree;
+        node->data.call_fn.argc = 1;
+        
+        // Don't forget to free the token after moving it
+        free(handle[0].item_token.data.id);
+    }
     else {
         error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
     }
@@ -587,6 +627,13 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
             }
             line = get_line_number();
             sym = token2symbol(token, prev, depth);
+            // Valmem for example x.length
+            if (sym == PSA_MEMBER) {
+                token = get_token(EOL_FORBIDDEN);
+                if (token.type != TOKEN_IDENTIFIER) {
+                    error_exit(ERR_SYN, line, "Expected member name after '.'!");
+                }
+            }
             if (prev == PSA_ID && item.item_token.type == TOKEN_IDENTIFIER && sym == PSA_LEFT_P) {
                 // Entering a function call
                 pop_item(&stack); // Pop i
@@ -602,6 +649,13 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
                 prev = PSA_RIGHT_P;
                 line = get_line_number();
                 sym = token2symbol(token, prev, depth);
+                // Valmem for example f().length
+                if (sym == PSA_MEMBER) {
+                    token = get_token(EOL_FORBIDDEN);
+                    if (token.type != TOKEN_IDENTIFIER) {
+                        error_exit(ERR_SYN, line, "Expected member name after '.'!");
+                    }
+                }
             }
             break;
 
