@@ -16,6 +16,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 static int cycle_counter = 0;
 static char *func_name = NULL;
 static value_type func_ret = TYPE_UNKNOWN;
+static program_struct *func_list = NULL;
 
 /*  Generate code from ast.h */
 void gen_function(function_struct* function);
@@ -89,12 +90,12 @@ void emit_expr_str(char *str)
 }
 /**
  * @brief   Checks if data type conversion between two variables is needed and generates the conversion 
- * @param   var1_type   First variable that could be data type INT (integer)
- * @param   var2_type   Second variable that could be data type FLOAT (double/float)
+ * @param  first_type   First variable that could be data type INT (integer)
+ * @param  second_type   Second variable that could be data type FLOAT (double/float)
  */
-void int2float(value_type var1_type, value_type var2_type)
+void int2float(value_type first_type, value_type second_type)
 {
-    if(var1_type == TYPE_INT && var2_type == TYPE_DOUBLE)
+    if(first_type == TYPE_INT && second_type == TYPE_DOUBLE)
     {
         newline_emit_expr("INT2FLOATS");
     }
@@ -147,7 +148,7 @@ int gen_code(program_struct *program_code)
     /*  Create temporary frame */
     newline_emit_expr("CREATEFRAME");
     function_struct *main_func = program_code->first_func;
-
+    func_list = program_code;
     /* Generating main function first */
     while(main_func != NULL)
     {
@@ -202,7 +203,23 @@ void emit_defvar(statement_struct *statement)
         statement = statement->next;
     }
 }
-
+/**
+ * @brief   Function that finds a function in a program by the name 
+ * @param   func_name   Name of the function we are trying to find
+ * @return  func    Pointer to a function with a matched name 
+ * @return  NULL    If the function is not found 
+ */
+function_struct *get_func(char *func_name)
+{
+    for(function_struct *func = func_list->first_func; func != NULL; func = func->next)
+    {
+        if(strcmp(func->func_name, func_name) == 0)
+        {
+            return func;
+        }
+    }
+    return NULL;
+}
 /**
  * @brief  Generate expressions based on their node type 
  * @param  expression  Pointer to a valid expression 
@@ -320,12 +337,18 @@ void gen_expression(expr_struct* expression)
             break;
         }
         case EXPR_CALL_FUNC:
+            char *expr_fn_name = expression->data.call_fn.name;
+            function_struct *called_func = get_func(expr_fn_name);
         /* For generating expressions in a function, we have to print out every single expression in a body of function*/
             for(int i = 0; i < expression->data.call_fn.argc; i++)
             {
             gen_expression(expression->data.call_fn.args[i]);
+            /* Check if INT2FLOATS conversion is needed between arguments of a function */
+            if(called_func != NULL)
+            {
+                int2float(expression->data.call_fn.args[i]->result_type, called_func->param_args[i].param_type);
             }
-            char *expr_fn_name = expression->data.call_fn.name;
+            }
             /*  Create a local frame for the function and call the function */
             newline_emit_expr("CREATEFRAME");
             /*  Check if the function is a built in type, if so call function with prefix fn_$builtin_ */
@@ -792,15 +815,17 @@ void sub_str()
     newline_emit_expr("LABEL substr_add");
     newline_emit_expr("JUMPIFEQ substr_done LF@start LF@end");
     newline_emit_expr("GETCHAR LF@$char LF@str LF@start");
-    newline_emit_expr("CONCAT LF@$substr LF@$substr LF@char");
+    newline_emit_expr("CONCAT LF@$substr LF@$substr LF@$char");
     newline_emit_expr("ADD LF@start LF@start int@1");
     newline_emit_expr("JUMP substr_add");
 
     newline_emit_expr("LABEL substr_done");
     newline_emit_expr("PUSHS LF@$substr");
-    newline_emit_expr("POPFRAME");
-    newline_emit_expr("RETURN");
-
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
     newline_emit_expr("LABEL substr_err");
     newline_emit_expr("EXIT int@40");
+    
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
 }
