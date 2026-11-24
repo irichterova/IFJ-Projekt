@@ -7,6 +7,8 @@
 #include "ast.h"
 #include <stdlib.h>
 
+static void free_statements(statement_struct *stmt);
+
 /**
  * @brief frees expression in AST
  * @param expr struct of freed expression
@@ -35,6 +37,11 @@ static void free_expr(expr_struct *expr) {
         break;
     case EXPR_UNA_OP:
         free_expr(expr->data.unary_op.operand);
+        break;
+    case EXPR_IF:
+        free_expr(expr->data.if_stmt.if_expr);
+        free_statements(expr->data.if_stmt.then_stmt);
+        free_statements(expr->data.if_stmt.else_stmt);
         break;
     default:
         break;
@@ -73,7 +80,17 @@ static void free_statements(statement_struct *stmt) {
         case STMT_IF:
             free_expr(cursor->data.if_stmt.if_expr);
             free_statements(cursor->data.if_stmt.then_stmt);
-            free_statements(cursor->data.if_stmt.else_stmt);
+            if (cursor->data.if_stmt.else_stmt != NULL) {
+                free_statements(cursor->data.if_stmt.else_stmt);
+            }
+            break;
+        case STMT_FOR:
+            free(cursor->data.for_lp.id_name);
+            free_expr(cursor->data.for_lp.from);
+            free_expr(cursor->data.for_lp.to);
+            free_expr(cursor->data.for_lp.step);
+            free_expr(cursor->data.for_lp.guard);
+            free_statements(cursor->data.for_lp.body);
             break;
         }
         free(cursor);

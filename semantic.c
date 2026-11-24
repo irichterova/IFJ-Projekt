@@ -14,6 +14,7 @@
 
 static void check_function(function_struct *func);
 static void check_command(statement_struct *command);
+static void check_condition(expr_struct *expr);
 
 static size_t codegen_next;
 static hashtable *func_hash;
@@ -37,7 +38,9 @@ static const builtin_func funcs[] = {{"print", 1, {any_dt}, unit_dt},
                                      {"strLength", 1, {string_dt}, int_dt},
                                      {"subStr", 3, {string_dt, int_dt, int_dt}, string_dt},
                                      {"ord", 2, {string_dt, int_dt}, int_dt},
-                                     {"chr", 1, {int_dt}, string_dt}};
+                                     {"chr", 1, {int_dt}, string_dt},
+                                     {"readBoolean", 0, {0}, bool_dt},
+                                     {"$floor", 1, {double_dt}, double_dt}};
 
 /**
  * @brief converts value_type to param_type
@@ -230,26 +233,6 @@ static bool compatible_type(value_type expected, value_type actual) {
 }
 
 /**
- * @brief checks if branch ends with return
- * @param branch branch of if statement
- * @return returns true if branch ends with return, false if not
- */
-static bool ends_with_return(statement_struct *branch) {
-    statement_struct *cursor = branch;
-    while (cursor->next != NULL) {
-        cursor = cursor->next;
-    }
-    if (cursor->stmt_type == STMT_RETURN) {
-        return true;
-    } else if (cursor->stmt_type == STMT_IF) {
-        return ends_with_return(cursor->data.if_stmt.else_stmt) &&
-               ends_with_return(cursor->data.if_stmt.then_stmt);
-    } else {
-        return false;
-    }
-}
-
-/**
  * @brief checks if branch ends with unit
  * @param branch branch of if statement
  * @return returns true if branch ends with unit, false if not
@@ -266,13 +249,72 @@ static bool ends_with_unit(statement_struct *branch) {
             return false;
         }
     } else if (cursor->stmt_type == STMT_VAL || cursor->stmt_type == STMT_VAR ||
-               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE) {
+               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE ||
+               cursor->stmt_type == STMT_FOR) {
         return true;
     } else if (cursor->stmt_type == STMT_IF) {
-        return ends_with_unit(cursor->data.if_stmt.else_stmt) &&
-               ends_with_unit(cursor->data.if_stmt.then_stmt);
+        if (cursor->data.if_stmt.else_stmt == NULL) {
+            return ends_with_unit(cursor->data.if_stmt.then_stmt);
+        } else {
+            return ends_with_unit(cursor->data.if_stmt.else_stmt) &&
+                   ends_with_unit(cursor->data.if_stmt.then_stmt);
+        }
     } else {
         return false;
+    }
+}
+
+/**
+ * @brief compares two value types
+ * @param first first type of branch
+ * @param second second type of branch
+ * @param line on which line is branch
+ * @return if they are same returns them, if one is unknown returns the other one, if one is int and
+ * second i double returns double, if none above returns error
+ */
+static value_type unify_types(value_type first, value_type second, int line) {
+    if (first == TYPE_UNKNOWN && second != TYPE_UNKNOWN) {
+        return second;
+    } else if (second == TYPE_UNKNOWN && first != TYPE_UNKNOWN) {
+        return first;
+    } else if (first == second) {
+        return first;
+    } else if ((first == TYPE_INT && second == TYPE_DOUBLE) ||
+               (first == TYPE_DOUBLE && second == TYPE_INT)) {
+        return TYPE_DOUBLE;
+    } else {
+        error_exit(ERR_SEM_TYPE, line, "Types of branch does not match with each other!");
+        return TYPE_UNKNOWN;
+    }
+}
+
+/**
+ * @brief checks result type of block based on type of statement
+ * @param block block we are checking
+ * @return returns type of value
+ */
+static value_type block_result_type(statement_struct *block) {
+    statement_struct *cursor = block;
+    while (cursor->next != NULL) {
+        cursor = cursor->next;
+    }
+    if (cursor->stmt_type == STMT_EXPR) {
+        return cursor->data.expr_stmt->result_type;
+    } else if (cursor->stmt_type == STMT_VAL || cursor->stmt_type == STMT_VAR ||
+               cursor->stmt_type == STMT_ASSIGN || cursor->stmt_type == STMT_WHILE ||
+               cursor->stmt_type == STMT_FOR) {
+        return TYPE_UNIT;
+    } else if (cursor->stmt_type == STMT_IF) {
+        if (cursor->data.if_stmt.else_stmt == NULL) {
+            return TYPE_UNIT;
+        } else {
+            return unify_types(block_result_type(cursor->data.if_stmt.then_stmt),
+                               block_result_type(cursor->data.if_stmt.else_stmt), cursor->line);
+        }
+    } else if (cursor->stmt_type == STMT_RETURN) {
+        return TYPE_UNKNOWN;
+    } else {
+        return TYPE_UNKNOWN;
     }
 }
 
@@ -439,6 +481,14 @@ static void check_expression(expr_struct *expr) {
             expr->result_type = convert_param2value(expr_attr->return_type);
         }
         break;
+    case EXPR_IF:
+        check_condition(expr->data.if_stmt.if_expr);
+        check_block(expr->data.if_stmt.then_stmt);
+        check_block(expr->data.if_stmt.else_stmt);
+        expr->result_type =
+            unify_types(block_result_type(expr->data.if_stmt.then_stmt),
+                        block_result_type(expr->data.if_stmt.else_stmt), expr->line);
+        break;
     default:
         break;
     }
@@ -500,10 +550,6 @@ static void check_command(statement_struct *command) {
                            "Declared type is not compatible with result type!");
             }
         } else {
-            if (command->data.var_stmt.init_expr->result_type ==
-                TYPE_BOOL) { // When extension BOOLTHEN it will be changed
-                error_exit(ERR_SEM_TYPE, command->line, "Variable cannot be type Boolean!");
-            }
             attr.data_type = convert_value2param(command->data.var_stmt.init_expr->result_type);
         }
         attr.codegen_id = codegen_next;
@@ -522,12 +568,11 @@ static void check_command(statement_struct *command) {
             check_expression(command->data.ret_stmt);
         }
         if (func_inspect->declared_ret_type == TYPE_UNKNOWN) {
-            error_exit(ERR_SEM_OTHER, command->line,
-                       "Function does not have declared return type!");
+            error_exit(ERR_SEM_TYPE, command->line, "Function does not have declared return type!");
         } else {
             if (command->data.ret_stmt == NULL) {
                 if (func_inspect->declared_ret_type != TYPE_UNIT) {
-                    error_exit(ERR_SEM_OTHER, command->line,
+                    error_exit(ERR_SEM_TYPE, command->line,
                                "Return with no expression has to have return type Unit!");
                 }
             } else {
@@ -547,11 +592,48 @@ static void check_command(statement_struct *command) {
     case STMT_IF:
         check_condition(command->data.if_stmt.if_expr);
         check_block(command->data.if_stmt.then_stmt);
-        check_block(command->data.if_stmt.else_stmt);
+        if (command->data.if_stmt.else_stmt != NULL) {
+            check_block(command->data.if_stmt.else_stmt);
+        }
         break;
     case STMT_WHILE:
         check_condition(command->data.while_lp.while_expr);
         check_block(command->data.while_lp.while_body);
+        break;
+    case STMT_FOR:
+        check_expression(command->data.for_lp.from);
+        if (command->data.for_lp.from->result_type != TYPE_INT) {
+            error_exit(ERR_SEM_TYPE, command->line, "'from' has to have type INT!");
+        }
+        check_expression(command->data.for_lp.to);
+        if (command->data.for_lp.to->result_type != TYPE_INT) {
+            error_exit(ERR_SEM_TYPE, command->line, "'to' has to have type INT");
+        }
+        if (command->data.for_lp.step != NULL) {
+            check_expression(command->data.for_lp.step);
+            if (command->data.for_lp.step->result_type != TYPE_INT) {
+                error_exit(ERR_SEM_TYPE, command->line, "'step' has to have type INT");
+            } else if (command->data.for_lp.step->node_type == EXPR_LIT_INT &&
+                       command->data.for_lp.step->data.lit_int == 0) {
+                error_exit(ERR_SEM_OTHER, command->line, "'step' cannot be 0!");
+            }
+        }
+        push_scope();
+        attr.symbol = variable;
+        attr.value_modif = nonmodif_val;
+        attr.data_type = int_dt;
+        attr.codegen_id = codegen_next;
+        command->data.for_lp.codegen_id = codegen_next;
+        codegen_next++;
+        status = insert_hash(scope_hash, command->data.for_lp.id_name, &attr);
+        if (status == insert_fail) {
+            error_exit(ERR_INTERNAL, command->line, "Insert hashtable failed!");
+        }
+        if (command->data.for_lp.guard != NULL) {
+            check_condition(command->data.for_lp.guard);
+        }
+        check_block(command->data.for_lp.body);
+        pop_scope();
         break;
     }
 }
@@ -599,6 +681,7 @@ static void check_function(function_struct *func) {
     if (func->declared_ret_type != TYPE_UNKNOWN) {
         func->result_ret_type = func->declared_ret_type;
         if (func->declared_ret_type != TYPE_UNIT) {
+            value_type block_res = block_result_type(func->stmt_body);
             switch (last_stmt->stmt_type) {
             case STMT_EXPR:
                 if (!compatible_type(func->declared_ret_type,
@@ -609,15 +692,17 @@ static void check_function(function_struct *func) {
             case STMT_VAL:
             case STMT_VAR:
             case STMT_ASSIGN:
+            case STMT_FOR:
             case STMT_WHILE:
                 error_exit(ERR_SEM_TYPE, last_stmt->line, "Return type is not Unit!");
                 break;
             case STMT_RETURN:
                 break;
             case STMT_IF:
-                if (!ends_with_return(func->stmt_body)) {
+                if (block_res != TYPE_UNKNOWN &&
+                    !compatible_type(func->declared_ret_type, block_res)) {
                     error_exit(ERR_SEM_TYPE, last_stmt->line,
-                               "If statement does not ends with return or Unit!");
+                               "If result does not match with declared result type!");
                 }
                 break;
             }
@@ -626,23 +711,24 @@ static void check_function(function_struct *func) {
         value_type derived_type = TYPE_UNKNOWN;
         switch (last_stmt->stmt_type) {
         case STMT_EXPR:
-            if (last_stmt->data.expr_stmt->result_type == TYPE_BOOL) {
-                error_exit(ERR_SEM_TYPE, last_stmt->line, "Wrong type for expression!");
-            } else {
-                derived_type = last_stmt->data.expr_stmt->result_type;
-            }
+            derived_type = last_stmt->data.expr_stmt->result_type;
             break;
         case STMT_VAL:
         case STMT_VAR:
         case STMT_WHILE:
         case STMT_ASSIGN:
+        case STMT_FOR:
             derived_type = TYPE_UNIT;
             break;
         case STMT_IF:
-            if (ends_with_unit(func->stmt_body)) {
-                derived_type = TYPE_UNIT;
+            if (last_stmt->data.if_stmt.else_stmt != NULL) {
+                derived_type = block_result_type(func->stmt_body);
             } else {
-                error_exit(ERR_SEM_TYPE, last_stmt->line, "Function does not end with unit!");
+                if (ends_with_unit(func->stmt_body)) {
+                    derived_type = TYPE_UNIT;
+                } else {
+                    error_exit(ERR_SEM_TYPE, last_stmt->line, "Function does not end with unit!");
+                }
             }
             break;
         default:
