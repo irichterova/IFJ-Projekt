@@ -604,6 +604,43 @@ void gen_statement(statement_struct* statement)
                 newline_emit_expr("PUSHS int@1");
             newline_emit_expr("POPS LF@$step$%zu", lp_codegen);
 
+            /* Check if the step is set to zero - infinite loop, end with error code 40 */
+            newline_emit_expr("JUMPIFNEQ for_step_ok_%i LF@$step$%zu int@0", for_counter, lp_codegen);
+            newline_emit_expr("EXIT int@40");
+            newline_emit_expr("LABEL for_step_ok_%i", for_counter);
+
+            /* Check if the step is positive or negative - decides the loop condition */
+            newline_emit_expr("LABEL for_loop_%i", for_counter);
+            newline_emit_expr("GT LF@$trash LF@$step$%zu int@0", lp_codegen);
+            newline_emit_expr("JUMPIFEQ for_negative_%i LF@$trash bool@false", for_counter);
+
+            /* If the step is forward - positive, end the loop if we passed the end value */
+            if(statement->data.for_lp.inclusive)
+            {
+                newline_emit_expr("GT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@true", for_counter);
+            }
+            else
+            {
+                newline_emit_expr("LT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@false", for_counter);
+            }
+            newline_emit_expr("JUMP for_body_%i", for_counter);
+
+            /* If the step is negative, end the loop if we reach below the end value */
+            newline_emit_expr("LABEL for_negative_%i", for_counter);
+            if(statement->data.for_lp.inclusive)
+            {
+                newline_emit_expr("LT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@true", for_counter);
+            }
+            else
+            {
+                newline_emit_expr("GT LF@$trash LF@%s$%zu LF@$end$%zu", loop_name, lp_codegen, lp_codegen);
+                newline_emit_expr("JUMPIFEQ for_end_%i LF@$trash bool@false", for_counter);
+            }
+
+            newline_emit_expr("LABEL for_body_%i", for_counter);
         }
 
         default:
