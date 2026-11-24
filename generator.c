@@ -209,6 +209,12 @@ void emit_defvar(statement_struct *statement)
             case STMT_WHILE:
                 emit_defvar(statement->data.while_lp.while_body);
                 break; 
+            case STMT_FOR:
+                newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.for_lp.id_name, statement->data.for_lp.codegen_id);
+                newline_emit_expr("DEFVAR LF@$end$%zu", statement->data.for_lp.codegen_id);
+                newline_emit_expr("DEFVAR LF@$step$%zu", statement->data.for_lp.codegen_id);
+                emit_defvar(statement->data.for_lp.body);
+                break;
             default:
             break;           
         }
