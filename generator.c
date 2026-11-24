@@ -209,6 +209,7 @@ void emit_defvar(statement_struct *statement)
             case STMT_WHILE:
                 emit_defvar(statement->data.while_lp.while_body);
                 break; 
+            /* In for loop cycle also generate defvar for variables used in the loop -> for(int id_name; i < end; i+= step) along with the body */
             case STMT_FOR:
                 newline_emit_expr("DEFVAR LF@%s$%zu", statement->data.for_lp.id_name, statement->data.for_lp.codegen_id);
                 newline_emit_expr("DEFVAR LF@$end$%zu", statement->data.for_lp.codegen_id);
@@ -355,12 +356,12 @@ void gen_expression(expr_struct* expression)
                 int logic_count = ++cycle_counter;
                 gen_expression(left_op);
                 newline_emit_expr("%s bool@%s", msg, bool_res);
-                newline_emit_expr("JUMPIFEQS $skip_right_op_%i", logic_count);
+                newline_emit_expr("JUMPIFEQS skip_right_op_%i", logic_count);
                 gen_expression(right_op);
-                newline_emit_expr("JUMP $end_logic_op_%i", logic_count);
-                newline_emit_expr("LABEL $skip_right_op_%i", logic_count);
+                newline_emit_expr("JUMP end_logic_op_%i", logic_count);
+                newline_emit_expr("LABEL skip_right_op_%i", logic_count);
                 newline_emit_expr("%s bool@%s", msg, bool_res);
-                newline_emit_expr("LABEL $end_logic_op_%i", logic_count);
+                newline_emit_expr("LABEL end_logic_op_%i", logic_count);
                 break;
             }
             value_type left_type = left_op->result_type;
@@ -583,7 +584,28 @@ void gen_statement(statement_struct* statement)
 
             newline_emit_expr("LABEL end_while_%i", while_counter); 
             break;
-        }          
+        }
+        case STMT_FOR:
+        {
+            int for_counter = ++cycle_counter;
+            char *loop_name = statement->data.for_lp.id_name;
+            size_t lp_codegen = statement->data.for_lp.codegen_id;
+
+            /* Get all starting values of a loop - start, end */
+            gen_expression(statement->data.for_lp.from);
+            newline_emit_expr("POPS LF@%s$%zu", loop_name, lp_codegen);
+            gen_expression(statement->data.for_lp.to);
+            newline_emit_expr("POPS LF@$end$%zu", lp_codegen);
+
+            /* If the starting step is not defined, set it to 1*/
+            if(statement->data.for_lp.step != NULL)
+                gen_expression(statement->data.for_lp.step);
+            else
+                newline_emit_expr("PUSHS int@1");
+            newline_emit_expr("POPS LF@$step$%zu", lp_codegen);
+
+        }
+
         default:
         break;   
     }
