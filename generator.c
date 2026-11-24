@@ -40,6 +40,7 @@ void str_len();
 void sub_str();
 void ord();
 void chr();
+void read_bool();
 
 
 /**
@@ -132,6 +133,7 @@ void gen_builtin()
         sub_str();
         ord();
         chr();
+        read_bool();
 }
 
 
@@ -245,12 +247,26 @@ void gen_expression(expr_struct* expression)
             emit_expr_str(expression->data.lit_string);
             emit_expr("\n");
             break;
+        case EXPR_LIT_TRUE:
+            emit_expr("%s bool@true", msg);
+            break;
+        case EXPR_LIT_FALSE:
+            emit_expr("%s bool@false", msg);
+            break;
         /* Variables must be defined before and generated in emit_defvar - pushing defined local frame variable on a stack */
         case EXPR_VARIABLE:
             newline_emit_expr("%s LF@%s$%zu", msg, expression->data.variable.id_name, expression->data.variable.codegen_id);
             break;
         case EXPR_UNA_OP:
             check_ptr(expression->data.unary_op.operand);
+            
+            /* Generate expression for unary operand ! */
+            if(expression->data.unary_op.op_type == OP_NOT)
+            {
+                gen_expression(expression->data.unary_op.operand);
+                newline_emit_expr("NOTS");
+                break;
+            }
         /* If the literal is type of int, push integer zero, if the literal is type double, push zero in float format.
         Subtract the expression value */
             if(expression->result_type == TYPE_INT)
@@ -268,6 +284,32 @@ void gen_expression(expr_struct* expression)
             expr_struct *right_op = expression->data.binary_op.right_operand;
             check_ptr(left_op);
             check_ptr(right_op);
+            
+            operator_type bin_op_type = expression->data.binary_op.op_type;
+            /* If binary operator is a logic operator (&&, ||), depending on the boolean value either skip the right operand (||) or generate 
+            the right operator for boolean value */
+            if(bin_op_type == OP_AND || bin_op_type == OP_OR)
+            {
+                char *bool_res;
+                if(bin_op_type == OP_OR)
+                {
+                    bool_res = "true";
+                }
+                else
+                {
+                    bool_res = "false";
+                }
+                int logic_count = ++cycle_counter;
+                gen_expression(left_op);
+                newline_emit_expr("%s bool@%s", msg, bool_res);
+                newline_emit_expr("JUMPIFEQS $skip_right_op_%i", logic_count);
+                gen_expression(right_op);
+                newline_emit_expr("JUMP $end_logic_op_%i", logic_count);
+                newline_emit_expr("LABEL $skip_right_op_%i", logic_count);
+                newline_emit_expr("%s bool@%s", msg, bool_res);
+                newline_emit_expr("LABEL $end_logic_op_%i", logic_count);
+                break;
+            }
             value_type left_type = left_op->result_type;
             value_type right_type = right_op->result_type;
 
@@ -331,6 +373,8 @@ void gen_expression(expr_struct* expression)
                     newline_emit_expr("EQS");
                     newline_emit_expr("NOTS");
                     break;
+                case OP_AND:
+                    
                 default:
                 break;
             }
@@ -688,6 +732,7 @@ void to_str()
     newline_emit_expr("JUMPIFEQ float_type LF@$type string@float");
     newline_emit_expr("JUMPIFEQ string_type LF@$type string@string");
     newline_emit_expr("JUMPIFEQ type_nil LF@$type string@nil");
+    newline_emit_expr("JUMPIFEQ bool_type LF@$type string@bool");
 
     /*  If the data type is string return the value */
     newline_emit_expr("LABEL string_type");
@@ -708,9 +753,18 @@ void to_str()
     newline_emit_expr("PUSHS LF@$str");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
 
+    /* If the data tupe is bool, push the boolean value */
+    newline_emit_expr("LABEL bool_type");
+    newline_emit_expr("JUMPIFEQ bool_false LF@value$ bool@false");
+    newline_emit_expr("PUSHS string@true");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+    newline_emit_expr("LABEL bool_false");
+    newline_emit_expr("PUSHS string@false");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
     /* If the data type is nil, print () */
     newline_emit_expr("LABEL type_nil");
-    newline_emit_expr("PUSHS string@()");
+    newline_emit_expr("PUSHS string@()");    
 
     newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
@@ -755,6 +809,28 @@ void read_int()
 
     newline_emit_expr("LABEL int_err");
     newline_emit_expr("PUSHS int@0");
+
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+/*  Same as read int but instead of int, read type bool */
+void read_bool()
+{
+    char *builtin_name = "$builtin_readInt";
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+    newline_emit_expr("DEFVAR LF@$val");
+    newline_emit_expr("READ LF@$val bool");
+    newline_emit_expr("DEFVAR LF@$type");
+    newline_emit_expr("TYPE LF@$type LF@$val");
+
+    newline_emit_expr("JUMPIFEQ bool_err LF@$type string@nil");
+    newline_emit_expr("PUSHS LF@$val");
+    newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
+    newline_emit_expr("LABEL bool_err");
+    newline_emit_expr("PUSHS bool@false");
 
     newline_emit_expr("LABEL end_fn_%s", builtin_name);
     newline_emit_expr("POPFRAME");
