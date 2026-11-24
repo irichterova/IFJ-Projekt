@@ -373,8 +373,6 @@ void gen_expression(expr_struct* expression)
                     newline_emit_expr("EQS");
                     newline_emit_expr("NOTS");
                     break;
-                case OP_AND:
-                    
                 default:
                 break;
             }
@@ -817,7 +815,7 @@ void read_int()
 /*  Same as read int but instead of int, read type bool */
 void read_bool()
 {
-    char *builtin_name = "$builtin_readInt";
+    char *builtin_name = "$builtin_readBoolean";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$val");
