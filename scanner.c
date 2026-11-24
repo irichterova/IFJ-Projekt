@@ -406,10 +406,6 @@ token_t get_token(enum eol_rules rule) {
                 token.type = TOKEN_OP_EQ;
                 token.after_eol = eol_before_token;
                 return token;
-            } else if (symbol == '>') {
-                token.type = TOKEN_FUNCTION_ARROW;
-                token.after_eol = eol_before_token;
-                return token;
             } else if (symbol != EOF) {
                 ungetc(symbol, stdin);
             }
@@ -481,7 +477,7 @@ token_t get_token(enum eol_rules rule) {
                 add_symbol2buffer(&identif_buffer, symbol);
             } else {
                 buffer_destruct(&identif_buffer);
-                error_exit(1, line_count, "'_' alone is not a valid identifier");
+                error_exit(2, line_count, "'_' alone is not a valid identifier");
             }
             break;
         case S_INT:
