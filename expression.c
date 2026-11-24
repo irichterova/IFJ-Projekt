@@ -87,6 +87,15 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
     switch (token.type) {
         // All of these result in i
         case TOKEN_IDENTIFIER:
+            // CONTROL add-on rules detecting to, until, by
+            if (prev == PSA_ID || prev == PSA_RIGHT_P || prev == PSA_MEMBER) {
+                // Is it a keyword, or a variable?
+                if (strcmp(token.data.id, "to") == 0 || strcmp(token.data.id, "until") == 0 || strcmp(token.data.id, "by") == 0) {
+                    // It was a keyword operand, return $
+                    return PSA_START_END;
+                }
+            }
+            /* Fallthrough */
         case TOKEN_INT_LITERAL:
         case TOKEN_DBL_LITERAL:
         case TOKEN_STR_LITERAL:
@@ -484,7 +493,7 @@ static void reduce(PSA_Stack *stack) {
         // The value before '.' becomes the only argument, x.length -> strLength(x)
         node->data.call_fn.args[0] = handle[1].subtree;
         node->data.call_fn.argc = 1;
-        
+
         // Don't forget to free the token after moving it
         free(handle[0].item_token.data.id);
     }
