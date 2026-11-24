@@ -39,7 +39,8 @@ static const builtin_func funcs[] = {{"print", 1, {any_dt}, unit_dt},
                                      {"subStr", 3, {string_dt, int_dt, int_dt}, string_dt},
                                      {"ord", 2, {string_dt, int_dt}, int_dt},
                                      {"chr", 1, {int_dt}, string_dt},
-                                     {"readBoolean", 0, {0}, bool_dt}};
+                                     {"readBoolean", 0, {0}, bool_dt},
+                                     {"$floor", 1, {double_dt}, double_dt}};
 
 /**
  * @brief converts value_type to param_type
