@@ -3,7 +3,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 *
 @file generator.c
 *
-@date 18-11-2026
+@date 25-11-2026
 @author xdongop00 Phuong Uyen Dongova
 */
 #include "generator.h"
@@ -593,16 +593,20 @@ void gen_statement(statement_struct* statement)
 
             /* Get all starting values of a loop - start, end */
             gen_expression(statement->data.for_lp.from);
-            newline_emit_expr("POPS LF@%s$%zu", loop_name, lp_codegen);
+            newline_emit_expr("%s LF@%s$%zu", msg, loop_name, lp_codegen);
             gen_expression(statement->data.for_lp.to);
-            newline_emit_expr("POPS LF@$end$%zu", lp_codegen);
+            newline_emit_expr("%s LF@$end$%zu", msg, lp_codegen);
 
             /* If the starting step is not defined, set it to 1*/
             if(statement->data.for_lp.step != NULL)
+            {
                 gen_expression(statement->data.for_lp.step);
+            }
             else
+            {
                 newline_emit_expr("PUSHS int@1");
-            newline_emit_expr("POPS LF@$step$%zu", lp_codegen);
+            }
+            newline_emit_expr("%s LF@$step$%zu", msg, lp_codegen);
 
             /* Check if the step is set to zero - infinite loop, end with error code 40 */
             newline_emit_expr("JUMPIFNEQ for_step_ok_%i LF@$step$%zu int@0", for_counter, lp_codegen);
@@ -641,8 +645,26 @@ void gen_statement(statement_struct* statement)
             }
 
             newline_emit_expr("LABEL for_body_%i", for_counter);
+            
+            /* Check guard - the condition inside a for loop, if the condition is false, skip the body of the loop */
+            if(statement->data.for_lp.guard != NULL)
+            {
+                gen_expression(statement->data.for_lp.guard);
+                newline_emit_expr("PUSHS bool@false");
+                newline_emit_expr("JUMPIFEQS for_next_%i", for_counter);
+            }
+            /* Generate the body */
+            for(statement_struct *stmt = statement->data.for_lp.body; stmt != NULL; stmt = stmt->next)
+            {
+                gen_statement(stmt);
+            }
+            newline_emit_expr("LABEL for_next_%i", for_counter);
+            /* Add the step to the current loop variable and jump back in the loop */
+            newline_emit_expr("ADD LF@%s$%zu LF@%s$%zu LF@$step$%zu", loop_name, lp_codegen, loop_name, lp_codegen, lp_codegen);
+            newline_emit_expr("JUMP for_loop_%i", for_counter);
+            newline_emit_expr("LABEL for_end_%i", for_counter);
+            break;
         }
-
         default:
         break;   
     }
