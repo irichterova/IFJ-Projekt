@@ -8,6 +8,7 @@
 #include <string.h>
 #include "expression.h"
 #include "error.h"
+#include "parser.h"
 
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
@@ -463,6 +464,8 @@ static void reduce(PSA_Stack *stack) {
 
     // E -> E.m
     else if (count == 2 && handle[1].item_symbol == PSA_E && handle[0].item_symbol == PSA_MEMBER) {
+        node->data.call_fn.is_valmem = true;
+        // Line is inherited from the top most item, operator is on the right side
         line = handle[0].line;
         node->node_type = EXPR_CALL_FUNC;
         node->result_type = TYPE_UNKNOWN;
@@ -477,7 +480,7 @@ static void reduce(PSA_Stack *stack) {
         } else if (strcmp(handle[0].item_token.data.id, "length") == 0) {
             fn_name = "strLength";
         } else {
-            error_exit(ERR_SYN, line, "Unsupported member '%s'!", handle[0].item_token.data.id);
+            error_exit(ERR_SEM_NDEF, line, "Unsupported member '%s'!", handle[0].item_token.data.id);
         }
         node->data.call_fn.name = malloc(strlen(fn_name) + 1);
         if (node->data.call_fn.name == NULL) {
@@ -498,7 +501,7 @@ static void reduce(PSA_Stack *stack) {
         free(handle[0].item_token.data.id);
     }
     else {
-        error_exit(ERR_SEM_NDEF, handle[0].line, "Handle doesn't correspond to any grammar rule!");
+        error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
     }
 
     node->line = line;
@@ -529,6 +532,7 @@ static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
     node->data.call_fn.name = id_token.data.id;
     node->data.call_fn.args = NULL;
     node->data.call_fn.argc = 0;
+    node->data.call_fn.is_valmem = false;
 
     call_depth++; // We are entering parentheses
 
@@ -600,6 +604,26 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
 
     psa_symbol sym = token2symbol(token, prev, depth);
     int second_token_pending = has_second; // Set to 0 after used
+
+    // Check for if
+    if (token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF) {
+        // Get line, give it its own node, push as a finished E, then continue
+        int if_line = get_line_number();
+        expr_struct *if_node = parse_if_in_expr(token, &token);
+        Stack_Item temp_item = {.item_symbol = PSA_E, .line = if_line, .subtree = if_node};
+        push_item(&stack, temp_item);
+
+        prev = PSA_RIGHT_P; // If expression is a finished operand like )
+        line = get_line_number();
+        sym = token2symbol(token, prev, depth);
+
+        if (sym == PSA_MEMBER) {
+            token = get_token(EOL_FORBIDDEN);
+            if (token.type != TOKEN_IDENTIFIER) {
+                error_exit(ERR_SYN, line, "Expected member name after '.'!");
+            }
+        }
+    }
 
     // Main loop
     while(1) {
