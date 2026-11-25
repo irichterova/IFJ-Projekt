@@ -498,7 +498,7 @@ static void reduce(PSA_Stack *stack) {
         free(handle[0].item_token.data.id);
     }
     else {
-        error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
+        error_exit(ERR_SEM_NDEF, handle[0].line, "Handle doesn't correspond to any grammar rule!");
     }
 
     node->line = line;
