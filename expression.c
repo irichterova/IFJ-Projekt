@@ -667,6 +667,27 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
                     error_exit(ERR_SYN, line, "Expected member name after '.'!");
                 }
             }
+
+            // Control add-on, if expression after ( is a finished operand
+            if (prev == PSA_LEFT_P && token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF) {
+                // Get line, give it its own node, push as a finished E, then continue
+                int if_line = get_line_number();
+                expr_struct *if_node = parse_if_in_expr(token, &token);
+                Stack_Item temp_item = {.item_symbol = PSA_E, .line = if_line, .subtree = if_node};
+                push_item(&stack, temp_item);
+
+                prev = PSA_RIGHT_P; // If expression is a finished operand like )
+                line = get_line_number();
+                sym = token2symbol(token, prev, depth);
+
+                if (sym == PSA_MEMBER) {
+                    token = get_token(EOL_FORBIDDEN);
+                    if (token.type != TOKEN_IDENTIFIER) {
+                        error_exit(ERR_SYN, line, "Expected member name after '.'!");
+                    }
+                }
+            }
+
             if (prev == PSA_ID && item.item_token.type == TOKEN_IDENTIFIER && sym == PSA_LEFT_P) {
                 // Entering a function call
                 pop_item(&stack); // Pop i
