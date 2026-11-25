@@ -465,8 +465,13 @@ static void check_expression(expr_struct *expr) {
             if (expr_attr->param_type_array[hdx] != any_dt) {
                 value_type val_type = convert_param2value(expr_attr->param_type_array[hdx]);
                 if (!compatible_type(val_type, expr->data.call_fn.args[hdx]->result_type)) {
-                    error_exit(ERR_SEM_ARG, expr->line,
-                               "Argument is not compatible with parameter type!");
+                    if (expr->data.call_fn.is_valmem) {
+                        error_exit(ERR_SEM_TYPE, expr->line,
+                                   "Member cannot be used for this type!");
+                    } else {
+                        error_exit(ERR_SEM_ARG, expr->line,
+                                   "Argument is not compatible with parameter type!");
+                    }
                 }
             }
         }
