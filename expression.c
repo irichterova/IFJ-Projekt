@@ -580,6 +580,18 @@ static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
 }
 
 /**
+ * @brief Helper function to validate member name
+ * @param token Pointer to token so it can be stored
+ * @param line Current line
+ */
+static void read_member_name(token_t *token, int line) {
+    *token = get_token(EOL_FORBIDDEN);
+    if (token->type != TOKEN_IDENTIFIER) {
+        error_exit(ERR_SYN, line, "Expected member name after '.'!");
+    }
+}
+
+/**
  * @brief The main loop of precedence analysis, called by the two main functions based on token count
  * @param first Starting token of expression
  * @param second Second token of expression, already loaded
@@ -618,10 +630,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
         sym = token2symbol(token, prev, depth);
 
         if (sym == PSA_MEMBER) {
-            token = get_token(EOL_FORBIDDEN);
-            if (token.type != TOKEN_IDENTIFIER) {
-                error_exit(ERR_SYN, line, "Expected member name after '.'!");
-            }
+            read_member_name(&token, line);
         }
     }
 
@@ -662,10 +671,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
             sym = token2symbol(token, prev, depth);
             // Valmem for example x.length
             if (sym == PSA_MEMBER) {
-                token = get_token(EOL_FORBIDDEN);
-                if (token.type != TOKEN_IDENTIFIER) {
-                    error_exit(ERR_SYN, line, "Expected member name after '.'!");
-                }
+                read_member_name(&token, line);
             }
 
             // Control add-on, if expression after ( is a finished operand
@@ -681,10 +687,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
                 sym = token2symbol(token, prev, depth);
 
                 if (sym == PSA_MEMBER) {
-                    token = get_token(EOL_FORBIDDEN);
-                    if (token.type != TOKEN_IDENTIFIER) {
-                        error_exit(ERR_SYN, line, "Expected member name after '.'!");
-                    }
+                    read_member_name(&token, line);
                 }
             }
 
@@ -705,10 +708,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
                 sym = token2symbol(token, prev, depth);
                 // Valmem for example f().length
                 if (sym == PSA_MEMBER) {
-                    token = get_token(EOL_FORBIDDEN);
-                    if (token.type != TOKEN_IDENTIFIER) {
-                        error_exit(ERR_SYN, line, "Expected member name after '.'!");
-                    }
+                    read_member_name(&token, line);
                 }
             }
             break;
