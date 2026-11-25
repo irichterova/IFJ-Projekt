@@ -94,7 +94,8 @@ static statement_struct *create_stmt(int line, statement_type type) {
 static void parse_statement_end(bool allow_else) {
     if (token.type == TOKEN_SEMICOLON) {
         next_token(EOL_OPTIONAL);
-    } else if (!token.after_eol && token.type != TOKEN_DEDENT &&
+    } else if (!token.after_eol && token.type != TOKEN_DEDENT && token.type != TOKEN_R_PARENTH &&
+               token.type != TOKEN_COMMA &&
                !(allow_else && token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_ELSE)) {
         error_exit(ERR_SYN, get_line_number(), "Expected eol or semicolon after statement!");
     }
@@ -432,6 +433,13 @@ static expr_struct *parse_if_expr(void) {
     if (expr->data.if_stmt.else_stmt == NULL) {
         error_exit(ERR_SYN, expr->line, "Else statement is mandatory!");
     }
+    return expr;
+}
+
+expr_struct *parse_if_in_expr(token_t first, token_t *next) {
+    token = first;
+    expr_struct *expr = parse_if_expr();
+    *next = token;
     return expr;
 }
 

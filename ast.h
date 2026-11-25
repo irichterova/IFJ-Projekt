@@ -70,6 +70,7 @@ typedef struct call_function {
     char *name;
     struct expr_struct **args;
     int argc;
+    bool is_valmem;
 } call_function;
 
 typedef struct def_var {
