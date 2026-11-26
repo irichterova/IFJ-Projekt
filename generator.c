@@ -3,7 +3,7 @@ IFJ/IAL project - Compiler for language IFJ26 to language IFJ26code
 *
 @file generator.c
 *
-@date 25-11-2026
+@date 26-11-2026
 @author xdongop00 Phuong Uyen Dongova
 */
 #include "generator.h"
@@ -23,7 +23,9 @@ void gen_function(function_struct* function);
 void gen_statement(statement_struct* statement);
 void gen_expression(expr_struct* expression);
 
+/* Print all defvars in an if expression */
 void emit_defvar_expr(expr_struct *expression);
+
 /* INT2FLOATS conversion */
 void int2float(value_type first_type, value_type second_type);
 
@@ -42,7 +44,7 @@ void sub_str();
 void ord();
 void chr();
 void read_bool();
-
+void floor_func();
 
 /**
  * @brief  Prints formatted line of IFJ26code without a newline
@@ -433,6 +435,7 @@ void gen_expression(expr_struct* expression)
             break;
         }
         case EXPR_CALL_FUNC:
+        {
             char *expr_fn_name = expression->data.call_fn.name;
             function_struct *called_func = get_func(expr_fn_name);
         /* For generating expressions in a function, we have to print out every single expression in a body of function*/
@@ -447,8 +450,25 @@ void gen_expression(expr_struct* expression)
             }
             /*  Create a local frame for the function and call the function */
             newline_emit_expr("CREATEFRAME");
+
+            /*  If function is valmem */
+            if(expression->data.call_fn.is_valmem)
+            {
+                if(strcmp(expr_fn_name, "toString") == 0)
+                {
+                    newline_emit_expr("CALL fn_$builtin_toStr");
+                }
+                else if(strcmp(expr_fn_name, "length") == 0)
+                {
+                    newline_emit_expr("CALL fn_$builtin_strLength");
+                }
+                else
+                /*  The rest of valmem functions have the same name as the built in function */
+                newline_emit_expr("CALL fn_$builtin_%s", expr_fn_name);
+                break;
+            }
             /*  Check if the function is a built in type, if so call function with prefix fn_$builtin_ */
-            if((strcmp(expr_fn_name, "print") == 0) ||
+            else if((strcmp(expr_fn_name, "print") == 0) ||
             (strcmp(expr_fn_name, "readLine") == 0) ||
             (strcmp(expr_fn_name, "readInt") == 0) ||
             (strcmp(expr_fn_name, "readDouble") == 0) ||
@@ -463,16 +483,23 @@ void gen_expression(expr_struct* expression)
                 newline_emit_expr("CALL fn_$builtin_%s", expr_fn_name);
             }
             else
+            {
             newline_emit_expr("CALL fn_%s", expr_fn_name);
+            }
             break;
+        }
             case EXPR_IF:
             int if_expr_counter = ++cycle_counter;
             expr_struct *if_expr = expression->data.if_stmt.if_expr;
+            /*  Generate condition of if expression */
             gen_expression(if_expr);
+            /*  If condition is false, jump to else branch */
             newline_emit_expr("PUSHS bool@false");
             newline_emit_expr("JUMPIFEQS if_expr_else_%i", if_expr_counter);
+            /*  Generate then branch and jump to end of if expression */
             gen_expr_return(expression->data.if_stmt.then_stmt, expression->result_type);
             newline_emit_expr("JUMP if_expr_end_%i", if_expr_counter);
+            /*  Generate else branch */
             newline_emit_expr("LABEL if_expr_else_%i", if_expr_counter);
             gen_expr_return(expression->data.if_stmt.else_stmt, expression->result_type);
             newline_emit_expr("LABEL if_expr_end_%i", if_expr_counter);
@@ -915,7 +942,7 @@ void to_str()
     newline_emit_expr("RETURN");
 }
 /**
- * @brief   Built in function that reads one line of string ending with LF or until it reaches EOF
+ * @brief   Built in function that reads one line of string from the standard input ending with LF or until it reaches EOF
  */
 void read_line()
 {
@@ -923,10 +950,11 @@ void read_line()
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$value");
+    /* Read string from standard input and save its data type */
     newline_emit_expr("READ LF@$value string");
     newline_emit_expr("DEFVAR LF@$type");
     newline_emit_expr("TYPE LF@$type LF@$value");
-
+    /* If the read line is nil, jump to eof_line and return empty string */
     newline_emit_expr("JUMPIFEQ eof_line LF@$type string@nil");
     newline_emit_expr("PUSHS LF@$value");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
@@ -937,12 +965,16 @@ void read_line()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that reads an integer from standard input, same as readLine but with integer
+ */
 void read_int()
 {
     char *builtin_name = "$builtin_readInt";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
     newline_emit_expr("DEFVAR LF@$val");
+
     newline_emit_expr("READ LF@$val int");
     newline_emit_expr("DEFVAR LF@$type");
     newline_emit_expr("TYPE LF@$type LF@$val");
@@ -958,7 +990,9 @@ void read_int()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
-/*  Same as read int but instead of int, read type bool */
+/**
+ * @brief   Built in function that reads a boolean value from the standard input, same as read int and readline but read type bool 
+ * */
 void read_bool()
 {
     char *builtin_name = "$builtin_readBoolean";
@@ -980,6 +1014,9 @@ void read_bool()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
+/**
+ * @brief   Built in function that reads a double - same as readline, readint,..
+ */
 void read_double()
 {
     char *builtin_name = "$builtin_readDouble";
@@ -1001,12 +1038,15 @@ void read_double()
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
-
+/**
+ * @brief   Built in function that returns a substring from index start to end, or exits with code 40 on invalid range
+ */
 void sub_str()
 {
     char *builtin_name = "$builtin_subStr";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
+    /*  Pop arguments from the stack in reverse order */
     newline_emit_expr("DEFVAR LF@end");
     newline_emit_expr("POPS LF@end");
     newline_emit_expr("DEFVAR LF@start");
@@ -1019,7 +1059,7 @@ void sub_str()
     newline_emit_expr("DEFVAR LF@$value");
     newline_emit_expr("DEFVAR LF@$char");
     newline_emit_expr("STRLEN LF@$len LF@str");
-
+    /* Check validity of parameters: start >= 0, end >= 0, start <= end, start < len, end <= len */
     newline_emit_expr("LT LF@$value LF@start int@0");
     newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@true");
     newline_emit_expr("LT LF@$value LF@end int@0");
@@ -1031,6 +1071,7 @@ void sub_str()
     newline_emit_expr("LT LF@$value LF@$len LF@end");
     newline_emit_expr("JUMPIFEQ substr_err LF@$value bool@true");
 
+    /* Build the resulting substring char by char from start to end */
     newline_emit_expr("MOVE LF@$substr string@");
     newline_emit_expr("LABEL substr_add");
     newline_emit_expr("JUMPIFEQ substr_done LF@start LF@end");
@@ -1039,13 +1080,46 @@ void sub_str()
     newline_emit_expr("ADD LF@start LF@start int@1");
     newline_emit_expr("JUMP substr_add");
 
+    /* Return the result substring */
     newline_emit_expr("LABEL substr_done");
     newline_emit_expr("PUSHS LF@$substr");
     newline_emit_expr("JUMP end_fn_%s", builtin_name);
+
+    /* If invalid params */
     newline_emit_expr("LABEL substr_err");
     newline_emit_expr("EXIT int@40");
     
     newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("POPFRAME");
+    newline_emit_expr("RETURN");
+}
+/**
+ * @brief   Built in function that rounds a double value down towards negative infinity
+ */
+void floor_func()
+{
+    char *builtin_name = "$builtin_floor";
+    newline_emit_expr("LABEL fn_%s", builtin_name);
+    newline_emit_expr("PUSHFRAME");
+
+    newline_emit_expr("DEFVAR LF@$val");
+    newline_emit_expr("POPS LF@$val");
+    newline_emit_expr("DEFVAR LF@$int");
+    newline_emit_expr("DEFVAR LF@$res");
+    newline_emit_expr("DEFVAR LF@$cond");
+
+    /*  Cut the decimal part of the float converting to int, then convert it back to float */
+    newline_emit_expr("FLOAT2INT LF@$int LF@$val");
+    newline_emit_expr("INT2FLOAT LF@$res LF@$int");
+
+    /*  Check if the converted number isnt greater than the original number, if not return the converted number */
+    newline_emit_expr("GT LF@$cond LF@$res LF@$val");
+    newline_emit_expr("JUMPIFEQ end_fn_%s LF@$cond bool@false", builtin_name);
+    /*  If the converted number is greater than the original number, substract 1*/
+    newline_emit_expr("SUB LF@$res LF@$res float@0x1p+0");
+
+    newline_emit_expr("LABEL end_fn_%s", builtin_name);
+    newline_emit_expr("PUSHS LF@$res");
     newline_emit_expr("POPFRAME");
     newline_emit_expr("RETURN");
 }
