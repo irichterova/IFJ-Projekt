@@ -10,10 +10,21 @@
 #include "ast.h" // For expr_struct
 #include "scanner.h" // For token_t
 
-// For expr and expr_noid - first token in, tree out
+/**
+ * @brief Parses an expression (expr OR expr_noid), creates its tree, stores following token
+ * @param first First token
+ * @param next Where to store the following token
+ * @return Pointer to the root of the expression tree
+ */
 expr_struct *parse_expr(token_t first, token_t *next);
 
-// For expr_rest - first two tokens in, tree out
+/**
+ * @brief Parses an expression (expr_rest), creates its tree, stores following token
+ * @param first First token
+ * @param second Second token
+ * @param next Where to store the following token
+ * @return Pointer to the root of the expression tree
+ */
 expr_struct *parse_expr_rest(token_t first, token_t second, token_t *next);
 
 #endif

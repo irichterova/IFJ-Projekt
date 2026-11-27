@@ -13,7 +13,7 @@
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
 
-static int call_depth = 0; // Number of open parentheses inside a function call
+static int call_depth = 0; // Number of opened function calls
 
 // Symbols defining the table, order must match rows/columns of precedence_table
 typedef enum {
