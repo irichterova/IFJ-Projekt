@@ -419,7 +419,9 @@ void gen_expression(expr_struct *expression) {
                 newline_emit_expr("CALL fn_$builtin_toStr");
             } else if (strcmp(expr_fn_name, "length") == 0) {
                 newline_emit_expr("CALL fn_$builtin_strLength");
-            } else
+            } else if(strcmp(expr_fn_name, "floor") == 0) {
+                newline_emit_expr("CALL fn_$builtin_$floor");
+            }
                 /*  The rest of valmem functions have the same name as the built in function */
                 newline_emit_expr("CALL fn_$builtin_%s", expr_fn_name);
             break;
