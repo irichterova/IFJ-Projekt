@@ -5,16 +5,16 @@
  * @brief Implements precedence syntax analysis and constructs expression AST nodes
  */
 
-#include <stdlib.h>
-#include <string.h>
 #include "expression.h"
 #include "error.h"
 #include "parser.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define PSA_TABLE_SIZE 19
 #define INITIAL_CAPACITY 16
 
-static int call_depth = 0; // Number of open parentheses inside a function call
+static int call_depth = 0; // Number of opened function calls
 
 // Symbols defining the table, order must match rows/columns of precedence_table
 typedef enum {
@@ -38,8 +38,8 @@ typedef enum {
     PSA_AND,         // && [BOOLTHEN]
     PSA_OR,          // || [BOOLTHEN]
     // Below are stack only symbols, not in the table
-    PSA_E,           // Expression E
-    PSA_STOP,        // Marker <
+    PSA_E,    // Expression E
+    PSA_STOP, // Marker <
 } psa_symbol;
 
 // What can be inside the table
@@ -50,6 +50,8 @@ typedef enum {
     PSA_REL_ERROR,  // Empty
 } psa_relation;
 
+// Clang format breaks the precedence table, so it gets an exception
+// clang-format off
 static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
     //               ~              *               /               +               -               <               <=              >               >=              ==              !=              i              (              )               $               .               !              &&              ||
     /* ~ */  {PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE},
@@ -72,7 +74,7 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
     /* && */ {PSA_REL_SHIFT, PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE},
     /* || */ {PSA_REL_SHIFT, PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_SHIFT,  PSA_REL_REDUCE},
 };
-
+// clang-format on
 /**
  * @brief Transforms a token into a corresponding symbol
  * @param token Token from scanner
@@ -80,84 +82,86 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
  * @param depth Number of currently open parentheses
  * @return Symbol representing the token
  */
-static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
+static psa_symbol token2symbol(token_t token, psa_symbol prev, int depth) {
     // EOL outside parentheses means end of expression
     if (token.after_eol && depth == 0 && call_depth == 0) {
         return PSA_START_END;
     }
 
     switch (token.type) {
-        // All of these result in i
-        case TOKEN_IDENTIFIER:
-            // CONTROL add-on rules detecting to, until, by
-            if (prev == PSA_ID || prev == PSA_RIGHT_P || prev == PSA_MEMBER) {
-                // Is it a keyword, or a variable?
-                if (strcmp(token.data.id, "to") == 0 || strcmp(token.data.id, "until") == 0 || strcmp(token.data.id, "by") == 0) {
-                    // It was a keyword operand, return $
-                    return PSA_START_END;
-                }
+    // All of these result in i
+    case TOKEN_IDENTIFIER:
+        // CONTROL add-on rules detecting to, until, by
+        if (prev == PSA_ID || prev == PSA_RIGHT_P || prev == PSA_MEMBER) {
+            // Is it a keyword, or a variable?
+            if (strcmp(token.data.id, "to") == 0 || strcmp(token.data.id, "until") == 0 ||
+                strcmp(token.data.id, "by") == 0) {
+                // It was a keyword operand, return $
+                return PSA_START_END;
             }
-            /* Fallthrough */
-        case TOKEN_INT_LITERAL:
-        case TOKEN_DBL_LITERAL:
-        case TOKEN_STR_LITERAL:
-        case TOKEN_TRUE_LITERAL:
-        case TOKEN_FALSE_LITERAL:
-            // To detect situations such as this: val x = id(1) id(2)
-            // We must check for ) in the previous token
-            if (prev == PSA_RIGHT_P) {
-                error_exit(ERR_SYN, get_line_number(), "Operands can't stand directly after a function call!");
-            }
-            return PSA_ID;
+        }
+        /* Fallthrough */
+    case TOKEN_INT_LITERAL:
+    case TOKEN_DBL_LITERAL:
+    case TOKEN_STR_LITERAL:
+    case TOKEN_TRUE_LITERAL:
+    case TOKEN_FALSE_LITERAL:
+        // To detect situations such as this: val x = id(1) id(2)
+        // We must check for ) in the previous token
+        if (prev == PSA_RIGHT_P) {
+            error_exit(ERR_SYN, get_line_number(),
+                       "Operands can't stand directly after a function call!");
+        }
+        return PSA_ID;
 
-        case TOKEN_OP_ADD:
-            return PSA_ADD;
-        case TOKEN_OP_MUL:
-            return PSA_MUL;
-        case TOKEN_OP_DIV:
-            return PSA_DIV;
-        case TOKEN_OP_LT:
-            return PSA_LESS;
-        case TOKEN_OP_LE:
-            return PSA_LESS_EQ;
-        case TOKEN_OP_GT:
-            return PSA_GREATER;
-        case TOKEN_OP_GE:
-            return PSA_GREATER_EQ;
-        case TOKEN_OP_EQ:
-            return PSA_EQUAL;
-        case TOKEN_OP_NEQ:
-            return PSA_NOT_EQUAL;
+    case TOKEN_OP_ADD:
+        return PSA_ADD;
+    case TOKEN_OP_MUL:
+        return PSA_MUL;
+    case TOKEN_OP_DIV:
+        return PSA_DIV;
+    case TOKEN_OP_LT:
+        return PSA_LESS;
+    case TOKEN_OP_LE:
+        return PSA_LESS_EQ;
+    case TOKEN_OP_GT:
+        return PSA_GREATER;
+    case TOKEN_OP_GE:
+        return PSA_GREATER_EQ;
+    case TOKEN_OP_EQ:
+        return PSA_EQUAL;
+    case TOKEN_OP_NEQ:
+        return PSA_NOT_EQUAL;
 
-        case TOKEN_OP_NOT:
-            return PSA_NOT;
-        case TOKEN_OP_AND:
-            return PSA_AND;
-        case TOKEN_OP_OR:
-            return PSA_OR;
+    case TOKEN_OP_NOT:
+        return PSA_NOT;
+    case TOKEN_OP_AND:
+        return PSA_AND;
+    case TOKEN_OP_OR:
+        return PSA_OR;
 
-        case TOKEN_L_PARENTH:
-            return PSA_LEFT_P;
-        case TOKEN_PERIOD:
-            // Handle valmem
-            return PSA_MEMBER;
-        case TOKEN_R_PARENTH:
-            if (depth == 0) {
-                return PSA_START_END; // $
-            }
-            return PSA_RIGHT_P;
+    case TOKEN_L_PARENTH:
+        return PSA_LEFT_P;
+    case TOKEN_PERIOD:
+        // Handle valmem
+        return PSA_MEMBER;
+    case TOKEN_R_PARENTH:
+        if (depth == 0) {
+            return PSA_START_END; // $
+        }
+        return PSA_RIGHT_P;
 
-        case TOKEN_OP_SUB:
-            // Scanner doesn't distinguish unary and binary minus
-            // So we do it ourselves
-            if (prev == PSA_ID || prev == PSA_RIGHT_P || prev == PSA_MEMBER) {
-                return PSA_SUB;
-            }
-            return PSA_UNARY_MINUS;
+    case TOKEN_OP_SUB:
+        // Scanner doesn't distinguish unary and binary minus
+        // So we do it ourselves
+        if (prev == PSA_ID || prev == PSA_RIGHT_P || prev == PSA_MEMBER) {
+            return PSA_SUB;
+        }
+        return PSA_UNARY_MINUS;
 
-        default:
-            // Any other token (then, do, ',', EOF, etc.) ends the expression
-            return PSA_START_END;
+    default:
+        // Any other token (then, do, ',', EOF, etc.) ends the expression
+        return PSA_START_END;
     }
 }
 
@@ -166,12 +170,12 @@ static psa_symbol token2symbol (token_t token, psa_symbol prev, int depth) {
 typedef struct psa_stack_item_t {
     psa_symbol item_symbol; // Terminal, PSA_E or PSA_STOP
     token_t item_token;     // For terminals only
-    expr_struct* subtree;   // Pointer to subtree created by reduction
+    expr_struct *subtree;   // Pointer to subtree created by reduction
     int line;               // Source line: terminal = line of its token, E = line set in reduction
 } Stack_Item;
 
 typedef struct psa_stack_t {
-    Stack_Item* stack_items; // Array of malloc'd items
+    Stack_Item *stack_items; // Array of malloc'd items
     int top;                 // Item count, top item is at top-1
     int capacity;            // Maximum capacity of the stack
 } PSA_Stack;
@@ -180,7 +184,7 @@ typedef struct psa_stack_t {
  * @brief Create a new stack
  * @param stack Pointer to stack variable
  */
-static void init_stack (PSA_Stack *stack) {
+static void init_stack(PSA_Stack *stack) {
     // Init a new stack
     stack->stack_items = malloc(sizeof(Stack_Item) * INITIAL_CAPACITY);
     // Failed malloc
@@ -196,12 +200,13 @@ static void init_stack (PSA_Stack *stack) {
  * @param stack Stack to push into
  * @param item Item to put at the top
  */
-static void push_item (PSA_Stack *stack, Stack_Item item) {
+static void push_item(PSA_Stack *stack, Stack_Item item) {
     // Add an item, expand if full
     if (stack->top >= stack->capacity) {
         stack->capacity *= 2;
 
-        Stack_Item *temp_stack_items = realloc(stack->stack_items, sizeof(Stack_Item) * stack->capacity);
+        Stack_Item *temp_stack_items =
+            realloc(stack->stack_items, sizeof(Stack_Item) * stack->capacity);
         // Failed realloc
         if (temp_stack_items == NULL) {
             free(stack->stack_items);
@@ -218,7 +223,7 @@ static void push_item (PSA_Stack *stack, Stack_Item item) {
  * @param stack Pointer to stack variable
  * @return The removed (formerly the top) item
  */
-static Stack_Item pop_item (PSA_Stack *stack) {
+static Stack_Item pop_item(PSA_Stack *stack) {
     if (stack->top == 0) {
         error_exit(ERR_INTERNAL, 0, "Tried to pop an empty stack!");
     }
@@ -231,7 +236,7 @@ static Stack_Item pop_item (PSA_Stack *stack) {
  * @param stack Pointer to stack variable
  * @return Item at the top
  */
-static Stack_Item top_item (PSA_Stack *stack) {
+static Stack_Item top_item(PSA_Stack *stack) {
     if (stack->top == 0) {
         error_exit(ERR_INTERNAL, 0, "Tried to read top of an empty stack!");
     }
@@ -243,10 +248,11 @@ static Stack_Item top_item (PSA_Stack *stack) {
  * @param stack Pointer to stack variable
  * @return Position of the top-most terminal
  */
-static int top_terminal (PSA_Stack *stack) {
+static int top_terminal(PSA_Stack *stack) {
     // top - 1 is the top-most stack item
     for (int i = stack->top - 1; i >= 0; i--) {
-        if (stack->stack_items[i].item_symbol != PSA_E && stack->stack_items[i].item_symbol != PSA_STOP) {
+        if (stack->stack_items[i].item_symbol != PSA_E &&
+            stack->stack_items[i].item_symbol != PSA_STOP) {
             return i;
         }
     }
@@ -259,7 +265,7 @@ static int top_terminal (PSA_Stack *stack) {
  * @brief Insert stop marker < after top-most terminal (start of handle)
  * @param stack Pointer to stack variable
  */
-static void insert_stop (PSA_Stack *stack) {
+static void insert_stop(PSA_Stack *stack) {
     if (stack->top == 0) {
         error_exit(ERR_INTERNAL, 0, "Tried to insert stop on an empty stack in insert_stop!");
     }
@@ -268,7 +274,8 @@ static void insert_stop (PSA_Stack *stack) {
     if (stack->top >= stack->capacity) {
         stack->capacity *= 2;
 
-        Stack_Item *temp_stack_items = realloc(stack->stack_items, sizeof(Stack_Item) * stack->capacity);
+        Stack_Item *temp_stack_items =
+            realloc(stack->stack_items, sizeof(Stack_Item) * stack->capacity);
         // Failed realloc
         if (temp_stack_items == NULL) {
             free(stack->stack_items);
@@ -278,10 +285,11 @@ static void insert_stop (PSA_Stack *stack) {
     }
     // Go over items from the top, if E or < skip, if not insert PSA_STOP
     for (int i = stack->top - 1; i >= 0; i--) {
-        if (stack->stack_items[i].item_symbol == PSA_E || stack->stack_items[i].item_symbol == PSA_STOP) {
+        if (stack->stack_items[i].item_symbol == PSA_E ||
+            stack->stack_items[i].item_symbol == PSA_STOP) {
             stack->stack_items[i + 1] = stack->stack_items[i];
         } else {
-            stack->stack_items[i + 1] = (Stack_Item){ .item_symbol = PSA_STOP, .subtree = NULL };
+            stack->stack_items[i + 1] = (Stack_Item){.item_symbol = PSA_STOP, .subtree = NULL};
             break;
         }
         if (i == 0) {
@@ -295,7 +303,7 @@ static void insert_stop (PSA_Stack *stack) {
  * @brief Frees the stack, not the subtrees
  * @param stack Pointer to stack variable
  */
-static void free_stack (PSA_Stack *stack) {
+static void free_stack(PSA_Stack *stack) {
     free(stack->stack_items);
     stack->stack_items = NULL;
     stack->capacity = 0;
@@ -365,8 +373,10 @@ static void reduce(PSA_Stack *stack) {
     pop_item(stack);
 
     // E -> ( E ) Nothing new, reuse
-    if (count == 3 && handle[2].item_symbol == PSA_LEFT_P && handle[1].item_symbol == PSA_E && handle[0].item_symbol == PSA_RIGHT_P) {
-        Stack_Item new_item = {.item_symbol = PSA_E, .line = handle[2].line, .subtree = handle[1].subtree};
+    if (count == 3 && handle[2].item_symbol == PSA_LEFT_P && handle[1].item_symbol == PSA_E &&
+        handle[0].item_symbol == PSA_RIGHT_P) {
+        Stack_Item new_item = {
+            .item_symbol = PSA_E, .line = handle[2].line, .subtree = handle[1].subtree};
         push_item(stack, new_item);
         return;
     }
@@ -374,7 +384,8 @@ static void reduce(PSA_Stack *stack) {
     // This will be our new subtree
     expr_struct *node = malloc(sizeof(expr_struct));
     if (node == NULL) {
-        error_exit(ERR_INTERNAL, handle[0].line, "Failed to allocate memory for a new AST node while reducing!");
+        error_exit(ERR_INTERNAL, handle[0].line,
+                   "Failed to allocate memory for a new AST node while reducing!");
     }
 
     int line = 0;
@@ -387,9 +398,10 @@ static void reduce(PSA_Stack *stack) {
         case TOKEN_IDENTIFIER:
             node->node_type = EXPR_VARIABLE;
             node->data.variable.id_name = handle[0].item_token.data.id;
-            node->result_type = TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
+            node->result_type =
+                TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
             break;
-        
+
         case TOKEN_INT_LITERAL:
             node->node_type = EXPR_LIT_INT;
             node->data.lit_int = handle[0].item_token.data.int_value;
@@ -407,7 +419,7 @@ static void reduce(PSA_Stack *stack) {
             node->data.lit_string = handle[0].item_token.data.str_value;
             node->result_type = TYPE_STRING;
             break;
-        
+
         case TOKEN_TRUE_LITERAL:
             node->node_type = EXPR_LIT_TRUE;
             node->result_type = TYPE_BOOL;
@@ -424,7 +436,8 @@ static void reduce(PSA_Stack *stack) {
     }
 
     // E -> ~E
-    else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_UNARY_MINUS) {
+    else if (count == 2 && handle[0].item_symbol == PSA_E &&
+             handle[1].item_symbol == PSA_UNARY_MINUS) {
         line = handle[1].line;
 
         // TODO: Type check done later in a shared type-check function (-string not allowed)
@@ -438,7 +451,8 @@ static void reduce(PSA_Stack *stack) {
     else if (count == 2 && handle[0].item_symbol == PSA_E && handle[1].item_symbol == PSA_NOT) {
         line = handle[1].line;
 
-        // TODO: Type check done later in a shared type-check function (!string or !int/double not allowed)
+        // TODO: Type check done later in a shared type-check function (!string or !int/double not
+        // allowed)
         node->node_type = EXPR_UNA_OP;
         node->data.unary_op.op_type = OP_NOT;
         node->data.unary_op.operand = handle[0].subtree;
@@ -453,11 +467,13 @@ static void reduce(PSA_Stack *stack) {
         node->data.binary_op.op_type = symbol2operator(handle[1].item_symbol, handle[1].line);
         node->data.binary_op.left_operand = handle[2].subtree;
         node->data.binary_op.right_operand = handle[0].subtree;
-        node->result_type = TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
+        node->result_type =
+            TYPE_UNKNOWN; // TODO: Type check done later in a shared type-check function
     }
 
     // E -> () special Unit rule
-    else if (count == 2 && handle[1].item_symbol == PSA_LEFT_P && handle[0].item_symbol == PSA_RIGHT_P) {
+    else if (count == 2 && handle[1].item_symbol == PSA_LEFT_P &&
+             handle[0].item_symbol == PSA_RIGHT_P) {
         line = handle[1].line;
         node->node_type = EXPR_LIT_UNIT;
         node->result_type = TYPE_UNIT;
@@ -481,7 +497,8 @@ static void reduce(PSA_Stack *stack) {
         } else if (strcmp(handle[0].item_token.data.id, "length") == 0) {
             fn_name = "strLength";
         } else {
-            error_exit(ERR_SEM_NDEF, line, "Unsupported member '%s'!", handle[0].item_token.data.id);
+            error_exit(ERR_SEM_NDEF, line, "Unsupported member '%s'!",
+                       handle[0].item_token.data.id);
         }
         node->data.call_fn.name = malloc(strlen(fn_name) + 1);
         if (node->data.call_fn.name == NULL) {
@@ -500,8 +517,7 @@ static void reduce(PSA_Stack *stack) {
 
         // Don't forget to free the token after moving it
         free(handle[0].item_token.data.id);
-    }
-    else {
+    } else {
         error_exit(ERR_SYN, handle[0].line, "Handle doesn't correspond to any grammar rule!");
     }
 
@@ -514,7 +530,8 @@ static void reduce(PSA_Stack *stack) {
 }
 
 /**
- * @brief Parses a function call id ( args ), each argument recursively via parse_expr, and creates an EXPR_CALL_FUNC node
+ * @brief Parses a function call id ( args ), each argument recursively via parse_expr, and creates
+ * an EXPR_CALL_FUNC node
  * @param id_token Identifier token with the function name
  * @param line Line of the function name, for the node and error messages
  * @param next Where to store the first token after the closing parentheses
@@ -545,9 +562,11 @@ static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
             // Parse one argument that ends on , or )
             expr_struct *arg = parse_expr(token, &token);
             // Realloc basically acts as a malloc too
-            expr_struct **tmp = realloc(node->data.call_fn.args, (node->data.call_fn.argc + 1) * sizeof(expr_struct *));
+            expr_struct **tmp = realloc(node->data.call_fn.args,
+                                        (node->data.call_fn.argc + 1) * sizeof(expr_struct *));
             if (tmp == NULL) {
-                error_exit(ERR_INTERNAL, line, "Couldn't allocate memory to a new argument in parse_call!");
+                error_exit(ERR_INTERNAL, line,
+                           "Couldn't allocate memory to a new argument in parse_call!");
             }
             node->data.call_fn.args = tmp;
             node->data.call_fn.args[node->data.call_fn.argc] = arg;
@@ -562,7 +581,9 @@ static expr_struct *parse_call(token_t id_token, int line, token_t *next) {
                         break;
                     } // Otherwise we must error_exit
                     else {
-                        error_exit(ERR_SYN, line, "Incorrect grammar, can't put ',' in front of ')' without a new line!");
+                        error_exit(
+                            ERR_SYN, line,
+                            "Incorrect grammar, can't put ',' in front of ')' without a new line!");
                         break;
                     }
                 } else {
@@ -593,10 +614,12 @@ static void read_member_name(token_t *token, int line) {
 }
 
 /**
- * @brief The main loop of precedence analysis, called by the two main functions based on token count
+ * @brief The main loop of precedence analysis, called by the two main functions based on token
+ * count
  * @param first Starting token of expression
  * @param second Second token of expression, already loaded
- * @param has_second True/false if we load second token that we were given instead of calling a new token directly
+ * @param has_second True/false if we load second token that we were given instead of calling a new
+ * token directly
  * @param next Pointer to next token, we store it there
  * @return AST node
  */
@@ -609,10 +632,10 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
     Stack_Item start_item = {.item_symbol = PSA_START_END};
     push_item(&stack, start_item);
 
-    token_t token = first;              // Current working token
-    token.after_eol = false;            // Newline from tokens from parser is ignored
-    psa_symbol prev = PSA_START_END;    // Previous symbol
-    int depth = 0;                      // Tracks the number of open parentheses
+    token_t token = first;           // Current working token
+    token.after_eol = false;         // Newline from tokens from parser is ignored
+    psa_symbol prev = PSA_START_END; // Previous symbol
+    int depth = 0;                   // Tracks the number of open parentheses
     int line = get_line_number();
 
     psa_symbol sym = token2symbol(token, prev, depth);
@@ -636,7 +659,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
     }
 
     // Main loop
-    while(1) {
+    while (1) {
         int t = top_terminal(&stack);
         psa_symbol top_sym = stack.stack_items[t].item_symbol;
 
@@ -676,7 +699,8 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
             }
 
             // Control add-on, if expression after ( is a finished operand
-            if (prev == PSA_LEFT_P && token.type == TOKEN_KEYWORD && token.data.keyword == KEYWORD_IF) {
+            if (prev == PSA_LEFT_P && token.type == TOKEN_KEYWORD &&
+                token.data.keyword == KEYWORD_IF) {
                 // Get line, give it its own node, push as a finished E, then continue
                 int if_line = get_line_number();
                 expr_struct *if_node = parse_if_in_expr(token, &token);
@@ -720,7 +744,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
         case PSA_REL_ERROR:
             error_exit(ERR_SYN, line, "Incorrect expression syntax!");
             break;
-        
+
         default:
             error_exit(ERR_SYN, line, "Relation somehow not in precedence table?");
             break;
@@ -733,7 +757,7 @@ static expr_struct *run_psa(token_t first, token_t second, int has_second, token
         error_exit(ERR_SYN, line, "Incorrect expression structure!");
     }
 
-    expr_struct* root = final_item.subtree;
+    expr_struct *root = final_item.subtree;
 
     *next = token;
     free_stack(&stack);
