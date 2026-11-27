@@ -1023,7 +1023,7 @@ void sub_str() {
  * @brief   Built in function that rounds a double value down towards negative infinity
  */
 void floor_func() {
-    char *builtin_name = "$builtin_floor";
+    char *builtin_name = "$builtin_$floor";
     newline_emit_expr("LABEL fn_%s", builtin_name);
     newline_emit_expr("PUSHFRAME");
 
