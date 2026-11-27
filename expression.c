@@ -49,6 +49,8 @@ typedef enum {
     PSA_REL_ERROR,  // Empty
 } psa_relation;
 
+// Clang format breaks the precedence table, so it gets an exception
+// clang-format off
 static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
     //               ~              *               /               +               -               <               <=              >               >=              ==              !=              i              (              )               $               .               !              &&              ||
     /* ~ */  {PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE},
@@ -71,7 +73,7 @@ static const psa_relation precedence_table[PSA_TABLE_SIZE][PSA_TABLE_SIZE] = {
     /* && */ {PSA_REL_SHIFT, PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE},
     /* || */ {PSA_REL_SHIFT, PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_SHIFT, PSA_REL_REDUCE, PSA_REL_REDUCE, PSA_REL_SHIFT,  PSA_REL_SHIFT, PSA_REL_SHIFT,  PSA_REL_REDUCE},
 };
-
+// clang-format on
 /**
  * @brief Transforms a token into a corresponding symbol
  * @param token Token from scanner
