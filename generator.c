@@ -1,8 +1,7 @@
 /**
- * Implementation of an IFJ26 Imperative Language Compiler
- *
- * @file generator.c
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Phuong Uyen Dongova (xdongop00)
+ * @file generator.c
  * @brief Converts abstract syntax tree from ast.h to IFJcode26
  */
 #include "generator.h"

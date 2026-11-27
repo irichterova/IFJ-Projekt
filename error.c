@@ -1,7 +1,8 @@
 /**
- * Project name: Compiler for IFJ26
- * @author Filip Bůžek, xbuzekf00
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
+ * @author Filip Bůžek (xbuzekf00)
  * @file error.c
+ * @brief Implements error handling and program termination
  */
 
 #include "error.h"

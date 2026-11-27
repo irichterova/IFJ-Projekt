@@ -1,8 +1,7 @@
 /**
- * Implementation of an IFJ26 Imperative Language Compiler
- *
- * @file generator.h
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Phuong Uyen Dongova (xdongop00)
+ * @file generator.h
  * @brief Declares functions for generating IFJcode26 code
  */
 

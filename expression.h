@@ -2,7 +2,7 @@
  * Project name: Implementation of an IFJ26 Imperative Language Compiler
  * @author Vojtěch Ziaťko (xziatkv00)
  * @file expression.h
- * @brief Declares the precedence analysis using a modified stack
+ * @brief Declares functions for parsing expressions
  */
 
 #ifndef EXPRESSION_H

@@ -1,10 +1,10 @@
-# IFJ-Projekt
+# Implementation of an IFJ26 Imperative Language Compiler
 
-Týmový projekt by: <br>
-Vojta <br>
-Filip <br>
-Izabela <br>
-Terka <br>
+Developed by: <br>
+Vojtěch Ziaťko <br>
+Filip Bůžek <br>
+Izabela Richterová <br>
+Phuong Uyen Dongova <br>
 
 
 Documentation in English <br>

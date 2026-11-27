@@ -1,7 +1,8 @@
 /**
- * Project name: Compiler for IFJ26
- * @author Filip Bůžek, xbuzekf00
+ * Project name: Implementation of an IFJ26 Imperative Language Compiler
+ * @author Filip Bůžek (xbuzekf00)
  * @file parser.c
+ * @brief Implements syntax analysis and constructs the abstract syntax tree (AST)
  */
 
 #include "parser.h"
