@@ -226,7 +226,8 @@ void emit_defvar_expr(expr_struct *expression) {
 void gen_expr_return(statement_struct *expr, value_type expect_ret) {
     for (statement_struct *stmt = expr; stmt != NULL; stmt = stmt->next) {
         if (stmt->next == NULL && stmt->stmt_type == STMT_IF) {
-            // Else if is stored as STMT_IF in the AST, so it's generated as an if expression so that the branch returns a value
+            // Else if is stored as STMT_IF in the AST, so it's generated as an if expression so
+            // that the branch returns a value
             expr_struct temp_expr = {0};
             temp_expr.node_type = EXPR_IF;
             temp_expr.result_type = expect_ret;
@@ -678,6 +679,12 @@ void gen_function(function_struct *function) {
     }
     /* Generate all statements in a function*/
     statement_struct *stmt = function->stmt_body;
+    /* Non-Unit functions return the value of their last statement,
+    so it is generated like an expression (with Int to Double conversion) */
+    if (func_ret != TYPE_UNIT) {
+        gen_expr_return(function->stmt_body, func_ret);
+        stmt = NULL;
+    }
     /* Check the return value of every statement */
     while (stmt != NULL) {
         if (stmt->next == NULL) {
