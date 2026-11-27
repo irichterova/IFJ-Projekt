@@ -7,7 +7,7 @@
 #ifndef EXPRESSION_H
 #define EXPRESSION_H
 
-#include "ast.h" // For expr_struct
+#include "ast.h"     // For expr_struct
 #include "scanner.h" // For token_t
 
 /**
