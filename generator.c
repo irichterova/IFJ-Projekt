@@ -124,6 +124,7 @@ void gen_builtin() {
     ord();
     chr();
     read_bool();
+    floor_func();
 }
 
 /**
