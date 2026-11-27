@@ -1,3 +1,6 @@
+# Project name: Implementation of an IFJ26 Imperative Language Compiler
+# author: Vojtěch Ziaťko (xziatkv00)
+
 CC = gcc
 CFLAGS = -g -Wall -Wextra -std=c11
 
